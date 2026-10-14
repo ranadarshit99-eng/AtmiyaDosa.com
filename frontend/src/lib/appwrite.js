@@ -9,7 +9,7 @@ client
 export const databases = new Databases(client);
 export const account = new Account(client);
 
-export const DATABASE_ID = 'hotel_pos_db';
+export const DATABASE_ID = '6ac0a4ee002d013a18f6';
 export const COLLECTIONS = {
   TABLES: 'tables',
   CATEGORIES: 'categories',

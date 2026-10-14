@@ -5,7 +5,7 @@ dotenv.config();
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
 const projectId = process.env.APPWRITE_PROJECT_ID || '6ac08445000e533e223f';
 const apiKey = process.env.APPWRITE_API_KEY;
-const databaseId = process.env.APPWRITE_DATABASE_ID || 'hotel_pos_db';
+const databaseId = process.env.APPWRITE_DATABASE_ID || '6ac0a4ee002d013a18f6';
 
 console.log('🌱 Appwrite Database Initializer & Seeder');
 
