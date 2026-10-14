@@ -1157,6 +1157,7 @@ export default function App() {
             <TablesView
               tables={tables}
               orders={orders}
+              restaurantSettings={settings}
               onAddTable={handleAddTable}
               onDeleteTable={handleDeleteTable}
               onSettleTableBill={handleSettleTableBill}
