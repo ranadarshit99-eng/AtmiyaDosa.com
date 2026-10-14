@@ -19,7 +19,10 @@ import {
   Globe, 
   Sparkles,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Package,
+  Zap,
+  BellRing
 } from 'lucide-react';
 
 import { 
@@ -36,6 +39,8 @@ import {
   INITIAL_ACTIVITY, 
   INITIAL_EMPLOYEES, 
   INITIAL_COUPONS,
+  INITIAL_INVENTORY,
+  INITIAL_SERVICE_CALLS,
   recordEmployeeActivity
 } from './lib/appwrite';
 import { getTranslation } from './lib/translations';
@@ -52,6 +57,8 @@ import ReportsAnalytics from './components/admin/ReportsAnalytics';
 import OffersView from './components/admin/OffersView';
 import QRManagementView from './components/admin/QRManagementView';
 import SettingsView from './components/admin/SettingsView';
+import InventoryView from './components/admin/InventoryView';
+import QuickPosModal from './components/admin/QuickPosModal';
 
 import CustomerMenu from './components/CustomerMenu';
 
@@ -78,8 +85,12 @@ export default function App() {
   const [activity, setActivity] = useState(() => getLocalStore('activity', INITIAL_ACTIVITY));
   const [employees, setEmployees] = useState(() => getLocalStore('employees', INITIAL_EMPLOYEES));
   const [coupons, setCoupons] = useState(() => getLocalStore('coupons', INITIAL_COUPONS));
+  const [inventory, setInventory] = useState(() => getLocalStore('inventory', INITIAL_INVENTORY));
+  const [serviceCalls, setServiceCalls] = useState(() => getLocalStore('service_calls', INITIAL_SERVICE_CALLS));
 
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
+  const [showQuickPos, setShowQuickPos] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState('Wed, 15 Oct 2025 | 11:42 AM');
 
   const t = (key) => getTranslation(currentLang, key);
@@ -94,6 +105,8 @@ export default function App() {
     setActivity(getLocalStore('activity', INITIAL_ACTIVITY));
     setEmployees(getLocalStore('employees', INITIAL_EMPLOYEES));
     setCoupons(getLocalStore('coupons', INITIAL_COUPONS));
+    setInventory(getLocalStore('inventory', INITIAL_INVENTORY));
+    setServiceCalls(getLocalStore('service_calls', INITIAL_SERVICE_CALLS));
     setAuthState(getLocalStore('auth_user', null));
   };
 
@@ -462,6 +475,158 @@ export default function App() {
     setLocalStore('coupons', updated);
   };
 
+  const handleRestockItem = (itemId, qty) => {
+    const updated = inventory.map(item => {
+      if (item.id === itemId) {
+        return { ...item, currentStock: (Number(item.currentStock) || 0) + Number(qty) };
+      }
+      return item;
+    });
+    setInventory(updated);
+    setLocalStore('inventory', updated);
+    const affected = inventory.find(i => i.id === itemId);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Chef Amit',
+      employeeRole: 'Head Chef',
+      tableNumber: 'Pantry Store',
+      actionType: 'STOCK_RESTOCKED',
+      details: `Restocked +${qty} ${affected?.unit || 'units'} of "${affected?.name || itemId}"`,
+      type: 'inventory',
+      color: 'emerald'
+    });
+    playSound('success');
+  };
+
+  const handleAddInventoryItem = (itemData) => {
+    const itemObj = { ...itemData, id: `inv_${Date.now()}` };
+    const updated = [...inventory, itemObj];
+    setInventory(updated);
+    setLocalStore('inventory', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: 'Admin / Owner',
+      tableNumber: 'Inventory',
+      actionType: 'RAW_MATERIAL_ADDED',
+      details: `Added new raw material SKU "${itemObj.name}" (${itemObj.category})`,
+      type: 'inventory',
+      color: 'indigo'
+    });
+    playSound('success');
+  };
+
+  const handleSettleTableBill = (orderId, tableNum, method = 'Cash') => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    const updatedOrders = orders.map(o => o.id === orderId ? {
+      ...o,
+      status: 'Completed',
+      payment_status: 'Paid',
+      payment_mode: method,
+      paid_collected_by: authUser?.name || 'Cashier',
+      payment_verified_online: method !== 'Cash'
+    } : o);
+    setOrders(updatedOrders);
+    setLocalStore('orders', updatedOrders);
+
+    // Free the table
+    const updatedTables = tables.map(t => 
+      (t.number === tableNum || t.number === `Table ${tableNum}`) ? {
+        ...t,
+        status: 'available',
+        current_order_id: null,
+        timing: null
+      } : t
+    );
+    setTables(updatedTables);
+    setLocalStore('tables', updatedTables);
+
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Cashier',
+      employeeRole: 'Cashier & POS Lead',
+      tableNumber: tableNum,
+      actionType: 'TABLE_BILL_SETTLED',
+      amount: targetOrder?.total || null,
+      paymentMethod: method,
+      details: `Settled Table ${tableNum} bill of ₹${targetOrder?.total || 0} via ${method}. Table freed for next guest.`,
+      type: 'payment',
+      color: 'emerald'
+    });
+    playSound('cash');
+  };
+
+  const handleShiftTable = (fromTable, toTable) => {
+    // Update order table_number
+    const updatedOrders = orders.map(o => {
+      if ((o.table_number === fromTable || o.table_number === `Table ${fromTable}`) && o.status !== 'Completed') {
+        return { ...o, table_number: toTable };
+      }
+      return o;
+    });
+    setOrders(updatedOrders);
+    setLocalStore('orders', updatedOrders);
+
+    // Update tables: fromTable becomes available, toTable becomes occupied
+    const activeFromOrder = orders.find(o => (o.table_number === fromTable || o.table_number === `Table ${fromTable}`) && o.status !== 'Completed');
+    const updatedTables = tables.map(t => {
+      if (t.number === fromTable) {
+        return { ...t, status: 'available', current_order_id: null, timing: null };
+      }
+      if (t.number === toTable) {
+        return { ...t, status: 'occupied', current_order_id: activeFromOrder?.id || null, timing: '5m' };
+      }
+      return t;
+    });
+    setTables(updatedTables);
+    setLocalStore('tables', updatedTables);
+
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: 'Floor Lead',
+      tableNumber: `${fromTable} -> ${toTable}`,
+      actionType: 'TABLE_SHIFTED',
+      details: `Shifted guest dining session & order from Table ${fromTable} to Table ${toTable}`,
+      type: 'table',
+      color: 'blue'
+    });
+    playSound('success');
+  };
+
+  const handleCallService = (type, tableNumber) => {
+    const labels = {
+      WAITER: 'Floor Waiter Assistance',
+      WATER: 'Drinking Water Refill',
+      BILL: 'Bill Settlement Request',
+      CLEAN: 'Table Cleaning'
+    };
+    const newCall = {
+      id: `srv_${Date.now()}`,
+      tableNumber,
+      type,
+      label: labels[type] || 'Assistance',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'pending'
+    };
+    const updated = [newCall, ...serviceCalls.slice(0, 19)];
+    setServiceCalls(updated);
+    setLocalStore('service_calls', updated);
+
+    recordEmployeeActivity({
+      employeeName: `Table ${tableNumber} Guest`,
+      employeeRole: 'Customer QR',
+      tableNumber,
+      actionType: `CALL_${type}`,
+      details: `Table ${tableNumber} guest requested: ${labels[type] || type}`,
+      type: 'table',
+      color: 'orange'
+    });
+    playSound('waiter');
+  };
+
+  const handleDismissServiceCall = (callId) => {
+    const updated = serviceCalls.filter(s => s.id !== callId);
+    setServiceCalls(updated);
+    setLocalStore('service_calls', updated);
+  };
+
   const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
     setLocalStore('settings', newSettings);
@@ -478,6 +643,7 @@ export default function App() {
         orders={orders}
         coupons={coupons}
         onPlaceOrder={handlePlaceCustomerOrder}
+        onCallService={handleCallService}
         currentLang={currentLang}
         onLanguageChange={setCurrentLang}
         restaurantSettings={settings}
@@ -605,6 +771,26 @@ export default function App() {
             >
               <Utensils className="w-4 h-4" />
               <span>{t('menuManagement')}</span>
+            </button>
+
+            {/* Raw Materials & Kitchen Inventory */}
+            <button
+              onClick={() => { setActiveTab('inventory'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
+                activeTab === 'inventory' 
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Package className="w-4 h-4" />
+                <span>Raw Materials</span>
+              </div>
+              {inventory.filter(i => (Number(i.currentStock) || 0) <= (Number(i.minThreshold) || 0)).length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-rose-500/20 text-rose-400">
+                  {inventory.filter(i => (Number(i.currentStock) || 0) <= (Number(i.minThreshold) || 0)).length} LOW
+                </span>
+              )}
             </button>
 
             {/* Employees */}
@@ -779,6 +965,79 @@ export default function App() {
                 </select>
               </div>
 
+              {/* Quick POS Rapid Counter Button */}
+              <button
+                onClick={() => setShowQuickPos(true)}
+                className="hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-black shadow-md shadow-orange-500/20 transition cursor-pointer"
+                title="Rapid Counter POS (Punch order in seconds)"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Quick POS</span>
+              </button>
+
+              {/* Table Service Calls Drawer Toggle */}
+              <div className="relative">
+                <button
+                  onClick={() => setServiceDrawerOpen(!serviceDrawerOpen)}
+                  className={`p-2 rounded-2xl relative transition ${
+                    serviceCalls.length > 0 
+                      ? 'bg-orange-100 text-orange-700 animate-pulse' 
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Table Service Requests (Waiter, Water, Bill)"
+                >
+                  <BellRing className="w-4 h-4" />
+                  {serviceCalls.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-orange-600 text-white text-[9px] font-black flex items-center justify-center shadow">
+                      {serviceCalls.length}
+                    </span>
+                  )}
+                </button>
+
+                {serviceDrawerOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-3xl p-4 shadow-2xl border border-slate-200 space-y-3 z-50">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center space-x-1.5">
+                        <BellRing className="w-4 h-4 text-orange-500" />
+                        <span className="text-xs font-black text-slate-900 font-heading">Table Service Calls</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-orange-600 font-mono">
+                        {serviceCalls.length} Pending
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {serviceCalls.map(call => (
+                        <div key={call.id} className="p-2.5 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center space-x-1.5">
+                              <span className="font-heading font-black text-xs text-orange-950">
+                                Table {call.tableNumber}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">{call.time}</span>
+                            </div>
+                            <p className="text-[11px] font-bold text-orange-800">{call.label}</p>
+                          </div>
+
+                          <button
+                            onClick={() => handleDismissServiceCall(call.id)}
+                            className="px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10px] shadow-sm"
+                          >
+                            Attend
+                          </button>
+                        </div>
+                      ))}
+
+                      {serviceCalls.length === 0 && (
+                        <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                          No active table service calls.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Customer Menu Bypass Shortcut */}
               <button
                 onClick={() => setViewMode('customer')}
@@ -897,8 +1156,11 @@ export default function App() {
           {activeTab === 'tables' && (
             <TablesView
               tables={tables}
+              orders={orders}
               onAddTable={handleAddTable}
               onDeleteTable={handleDeleteTable}
+              onSettleTableBill={handleSettleTableBill}
+              onShiftTable={handleShiftTable}
               onSelectQRTable={(t) => {
                 setActiveTab('qr');
               }}
@@ -920,6 +1182,16 @@ export default function App() {
               onDeleteMenuItem={handleDeleteMenuItem}
               onApplyDiscount={handleApplyDiscount}
               onRemoveDiscount={handleRemoveDiscount}
+              currentLang={currentLang}
+            />
+          )}
+
+          {activeTab === 'inventory' && (
+            <InventoryView
+              inventory={inventory}
+              onRestockItem={handleRestockItem}
+              onAddInventoryItem={handleAddInventoryItem}
+              currentStaff={{ name: authUser?.name || 'Chef Amit', role: authUser?.role || 'Head Chef' }}
               currentLang={currentLang}
             />
           )}
@@ -971,19 +1243,32 @@ export default function App() {
         {/* 4. FOOTER */}
         <footer className="p-4 sm:px-8 border-t border-slate-200/80 bg-white text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center space-x-2 font-medium">
-            <span className="font-bold text-slate-800">{settings?.restaurantName || 'Atmiya Dosa'}</span>
+            <span className="font-bold text-slate-800">{settings?.restaurantName || 'Atmiya Dosa Hub'}</span>
             <span>•</span>
-            <span>Restaurant Management System</span>
+            <span>Enterprise Restaurant Management & POS Suite</span>
           </div>
 
           <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-400">
             <span>Built with ❤️ for Restaurants</span>
             <span>|</span>
-            <span className="text-orange-600 font-bold">Powered by Appwrite</span>
+            <span className="text-orange-600 font-bold">Powered by Appwrite Real-Time</span>
           </div>
         </footer>
 
       </div>
+
+      {/* 5. RAPID COUNTER POS MODAL OVERLAY */}
+      {showQuickPos && (
+        <QuickPosModal
+          tables={tables}
+          menuItems={menuItems}
+          categories={categories}
+          coupons={coupons}
+          onPlaceOrder={handlePlaceCustomerOrder}
+          onClose={() => setShowQuickPos(false)}
+          currentStaff={{ name: authUser?.name || 'Darshit Rana', role: authUser?.role || 'Admin' }}
+        />
+      )}
 
     </div>
   );

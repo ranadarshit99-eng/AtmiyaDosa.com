@@ -763,4 +763,24 @@ export const INITIAL_COUPONS = [
   { id: 'c3', code: 'FESTIVE100', discount: 100, type: 'flat', min_order: 500, active: true }
 ];
 
+// Raw Ingredients & Inventory Stock Control (Enterprise Feature)
+export const INITIAL_INVENTORY = [
+  { id: 'inv_1', name: 'Special Dosa Batter', category: 'Raw Batter', currentStock: 18, unit: 'kg', minThreshold: 8, costPerUnit: 45, supplier: 'Atmiya Central Prep' },
+  { id: 'inv_2', name: 'Amul Salted Butter', category: 'Dairy & Fats', currentStock: 24, unit: 'blocks (500g)', minThreshold: 10, costPerUnit: 275, supplier: 'Amul Authorized Distributor' },
+  { id: 'inv_3', name: 'Amul Processed Cheese', category: 'Dairy & Fats', currentStock: 12, unit: 'tins (1kg)', minThreshold: 5, costPerUnit: 520, supplier: 'Amul Authorized Distributor' },
+  { id: 'inv_4', name: 'Fresh Malai Paneer', category: 'Dairy & Fats', currentStock: 6.5, unit: 'kg', minThreshold: 4, costPerUnit: 340, supplier: 'Local Anand Dairy' },
+  { id: 'inv_5', name: 'Pav Bread Fresh Loaves', category: 'Bakery', currentStock: 45, unit: 'packets', minThreshold: 20, costPerUnit: 25, supplier: 'Petlad Bakery Express' },
+  { id: 'inv_6', name: 'Fresh Potatoes (Boiled)', category: 'Vegetables', currentStock: 28, unit: 'kg', minThreshold: 12, costPerUnit: 22, supplier: 'Petlad APMC Mandi' },
+  { id: 'inv_7', name: 'Mysore Red Chilli Paste', category: 'Spices & Chutneys', currentStock: 4.2, unit: 'kg', minThreshold: 3, costPerUnit: 180, supplier: 'House Made' },
+  { id: 'inv_8', name: 'Fresh Coconut Chutney', category: 'Chutneys', currentStock: 9, unit: 'liters', minThreshold: 4, costPerUnit: 60, supplier: 'House Daily Grind' },
+  { id: 'inv_9', name: 'Toor Dal Sambhar Base', category: 'Gravies', currentStock: 15, unit: 'liters', minThreshold: 6, costPerUnit: 55, supplier: 'Kitchen Base Batch' }
+];
+
+// Live Table Service Requests (Call Waiter, Water, Bill)
+export const INITIAL_SERVICE_CALLS = [
+  { id: 'srv_1', tableNumber: 'T02', type: 'WATER', label: 'Extra Water Jar', time: '11:43 AM', status: 'pending' },
+  { id: 'srv_2', tableNumber: 'T07', type: 'BILL', label: 'Bill / Payment Settle', time: '11:45 AM', status: 'pending' }
+];
+
+
 
