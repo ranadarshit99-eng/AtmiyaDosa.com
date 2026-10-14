@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   Globe,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { getTranslation } from '../lib/translations';
 import { playSound } from '../lib/sound';
@@ -28,6 +29,7 @@ export default function CustomerMenu({
   setCurrentTable, 
   categories, 
   menuItems, 
+  orders = [],
   coupons, 
   onPlaceOrder, 
   currentLang, 
@@ -66,17 +68,32 @@ export default function CustomerMenu({
     return true;
   });
 
+  // Sort: Discounted items show FIRST as required in Section 4 of Admin.txt
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (a.hasDiscount && !b.hasDiscount) return -1;
+    if (!a.hasDiscount && b.hasDiscount) return 1;
+    return (b.orders_count || 0) - (a.orders_count || 0);
+  });
+
+  // Check for any recent cancelled order for this table (Section 7 of Admin.txt)
+  const recentCancelledOrder = orders?.find(o => 
+    (o.table_number === currentTable || o.table_number === `Table ${currentTable}`) && 
+    o.status === 'Cancelled' && 
+    o.cancel_reason
+  );
+
   const getItemCartQty = (id) => {
     const found = cart.find(i => i.id === id);
     return found ? found.qty : 0;
   };
 
   const handleAddToCart = (item) => {
+    const unitPrice = Number(item.finalPrice || item.price || 0);
     const existing = cart.find(i => i.id === item.id);
     if (existing) {
       setCart(cart.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
     } else {
-      setCart([...cart, { ...item, qty: 1 }]);
+      setCart([...cart, { ...item, price: unitPrice, qty: 1 }]);
     }
     playSound('order');
   };
@@ -201,6 +218,27 @@ export default function CustomerMenu({
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-5">
         
+        {/* Out-of-Stock / Cancellation Alert Banner (Section 7 of Admin.txt) */}
+        {recentCancelledOrder && (
+          <div className="rounded-2xl p-4 bg-rose-50 border-2 border-rose-400 text-rose-950 shadow-md flex items-start space-x-3.5 animate-fadeIn">
+            <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-xs">
+              <div className="font-black text-rose-800 text-sm flex items-center space-x-2">
+                <span>Order Notice for Table {currentTable}</span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 font-mono text-[10px] font-bold">
+                  {recentCancelledOrder.id}
+                </span>
+              </div>
+              <p className="mt-1 font-semibold text-rose-900 leading-relaxed">
+                Your order could not be fulfilled: <span className="font-black underline bg-rose-100 px-1 py-0.5 rounded">{recentCancelledOrder.cancel_reason}</span>
+              </p>
+              <p className="text-[11px] text-rose-700 mt-1 font-medium">
+                Please select an alternative dish from our live menu below or notify floor staff.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Banner with Restaurant Food Promo */}
         <div className="rounded-3xl p-5 bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-md flex items-center justify-between overflow-hidden relative">
           <div className="space-y-1 z-10 max-w-xs sm:max-w-md">
@@ -237,7 +275,7 @@ export default function CustomerMenu({
 
           {/* Category Tabs */}
           <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-            {['All', 'Dosa', 'South Indian', 'Pizza & Fast Food', 'Beverages', 'Others & Desserts'].map(cat => (
+            {['All', 'Mysore Dosa', 'Fancy Dosa', 'Pav Bhaji & Pulao', 'Beverages', 'South Indian'].map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -276,12 +314,29 @@ export default function CustomerMenu({
           </div>
         </div>
 
-        {/* Menu Items Grid */}
+        {/* Menu Items Grid - Sorted to place Discounted items FIRST */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredItems.map(item => {
+          {sortedItems.map(item => {
             const qty = getItemCartQty(item.id);
+            const currentItemPrice = item.finalPrice || item.price;
+            const originalItemPrice = item.originalPrice || item.price;
+            const savings = Math.max(0, originalItemPrice - currentItemPrice);
+
             return (
-              <div key={item.id} className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between gap-3 hover:shadow-md transition">
+              <div 
+                key={item.id} 
+                className={`bg-white rounded-3xl p-4 border shadow-sm flex items-center justify-between gap-3 hover:shadow-md transition relative ${
+                  item.hasDiscount ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-slate-200/80'
+                }`}
+              >
+                {/* Bold Red DISCOUNT Badge (Section 4 of Admin.txt) */}
+                {item.hasDiscount && (
+                  <div className="absolute -top-2.5 right-4 z-10 px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] tracking-wider uppercase shadow-md flex items-center space-x-1 border border-white">
+                    <span>🔥 DISCOUNT</span>
+                    <span>{item.discountPercent}% OFF</span>
+                  </div>
+                )}
+
                 <div className="space-y-1.5 flex-1 pr-2">
                   <div className="flex items-center space-x-1.5">
                     {item.is_veg && (
@@ -296,8 +351,27 @@ export default function CustomerMenu({
                   <h3 className="text-sm font-black text-slate-900 font-heading leading-tight">{item.name}</h3>
                   <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{item.description}</p>
                   
-                  <div className="text-base font-black text-slate-950 font-heading pt-1">
-                    ₹ {item.price}
+                  {/* Price Display with Strikethrough for Discount */}
+                  <div className="flex items-baseline space-x-2 pt-1">
+                    {item.hasDiscount ? (
+                      <>
+                        <span className="text-base font-black text-rose-600 font-heading">
+                          ₹{currentItemPrice}
+                        </span>
+                        <span className="text-xs line-through text-slate-400 font-mono font-semibold">
+                          ₹{originalItemPrice}
+                        </span>
+                        {savings > 0 && (
+                          <span className="text-[9px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            SAVE ₹{savings}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-base font-black text-slate-950 font-heading">
+                        ₹{currentItemPrice}
+                      </span>
+                    )}
                   </div>
                 </div>
 

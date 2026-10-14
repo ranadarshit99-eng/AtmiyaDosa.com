@@ -35,7 +35,8 @@ import {
   INITIAL_ORDERS, 
   INITIAL_ACTIVITY, 
   INITIAL_EMPLOYEES, 
-  INITIAL_COUPONS 
+  INITIAL_COUPONS,
+  recordEmployeeActivity
 } from './lib/appwrite';
 import { getTranslation } from './lib/translations';
 import { playSound } from './lib/sound';
@@ -136,7 +137,73 @@ export default function App() {
     const updated = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
     setOrders(updated);
     setLocalStore('orders', updated);
+
+    const targetOrder = orders.find(o => o.id === orderId);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: targetOrder?.table_number || 'Kitchen',
+      actionType: `ORDER_${newStatus.toUpperCase()}`,
+      amount: targetOrder?.total || null,
+      details: `Order #${orderId} status changed to "${newStatus}" by ${authUser?.name || 'Staff'}`,
+      type: 'order',
+      color: newStatus === 'Completed' ? 'emerald' : newStatus === 'Preparing' ? 'amber' : 'orange'
+    });
     playSound('order');
+  };
+
+  const handleMarkCashPaymentDone = (orderId, staffName) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!targetOrder) return;
+    const collector = staffName || authUser?.name || 'Anjali Patel';
+    const updated = orders.map(o => o.id === orderId ? {
+      ...o,
+      payment_status: 'Paid',
+      payment_mode: 'Cash',
+      paid_collected_by: collector,
+      payment_verified_online: false
+    } : o);
+    setOrders(updated);
+    setLocalStore('orders', updated);
+
+    recordEmployeeActivity({
+      employeeName: collector,
+      employeeRole: 'Cashier & POS Lead',
+      tableNumber: targetOrder.table_number || 'Dine-In',
+      actionType: 'PAYMENT_COLLECTED_CASH',
+      amount: targetOrder.total,
+      paymentMethod: 'Cash',
+      details: `Cash payment of ₹${targetOrder.total} collected & confirmed for Table ${targetOrder.table_number || 'Dine-In'} by ${collector}`,
+      type: 'payment',
+      color: 'emerald'
+    });
+    playSound('success');
+  };
+
+  const handleCancelOrderWithReason = (orderId, reason, staffName) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!targetOrder) return;
+    const staff = staffName || authUser?.name || 'Admin';
+    const updated = orders.map(o => o.id === orderId ? {
+      ...o,
+      status: 'Cancelled',
+      cancel_reason: reason,
+      cancelled_by: staff
+    } : o);
+    setOrders(updated);
+    setLocalStore('orders', updated);
+
+    recordEmployeeActivity({
+      employeeName: staff,
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: targetOrder.table_number || 'Online Queue',
+      actionType: 'ORDER_CANCELLED_OUT_OF_STOCK',
+      amount: targetOrder.total,
+      details: `Order #${targetOrder.id} cancelled. Reason: ${reason} (Authorized by ${staff})`,
+      type: 'order',
+      color: 'rose'
+    });
+    playSound('alert');
   };
 
   const handlePlaceCustomerOrder = (newOrder) => {
@@ -144,17 +211,17 @@ export default function App() {
     setOrders(updated);
     setLocalStore('orders', updated);
 
-    // Add to activity stream
-    const newActivity = {
-      id: `act_${Date.now()}`,
-      time: newOrder.time,
+    recordEmployeeActivity({
+      employeeName: newOrder.customer_name || 'Guest User',
+      employeeRole: 'Guest / QR Self-Order',
+      tableNumber: newOrder.table_number || 'Online',
+      actionType: 'ORDER_PLACED_QR',
+      amount: newOrder.total,
+      paymentMethod: newOrder.payment_mode || 'UPI',
+      details: `Order #${newOrder.id} placed via QR at Table ${newOrder.table_number} (₹${newOrder.total})`,
       type: 'order',
-      text: `Order ${newOrder.id} placed at Table ${newOrder.table_number}`,
-      icon: 'ShoppingBag'
-    };
-    const updatedActivity = [newActivity, ...activity.slice(0, 8)];
-    setActivity(updatedActivity);
-    setLocalStore('activity', updatedActivity);
+      color: 'orange'
+    });
     playSound('order');
   };
 
@@ -171,6 +238,15 @@ export default function App() {
     const updated = [...tables, tableObj];
     setTables(updated);
     setLocalStore('tables', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: tableData.number,
+      actionType: 'TABLE_ADDED',
+      details: `Added new dining table ${tableData.number} (${tableData.zone}, Capacity: ${tableData.capacity})`,
+      type: 'table',
+      color: 'blue'
+    });
     playSound('success');
   };
 
@@ -179,37 +255,188 @@ export default function App() {
     const updated = tables.filter(t => t.id !== id);
     setTables(updated);
     setLocalStore('tables', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: id,
+      actionType: 'TABLE_DELETED',
+      details: `Deleted dining table ${id}`,
+      type: 'table',
+      color: 'rose'
+    });
   };
 
   const handleToggleStock = (itemId) => {
-    const updated = menuItems.map(item => item.id === itemId ? { ...item, is_available: !item.is_available } : item);
+    const updated = menuItems.map(item => {
+      if (item.id === itemId) {
+        const nextState = !item.is_available;
+        recordEmployeeActivity({
+          employeeName: authUser?.name || 'Admin',
+          employeeRole: authUser?.role || 'Admin',
+          tableNumber: 'Kitchen Store',
+          actionType: nextState ? 'DISH_IN_STOCK' : 'DISH_OUT_OF_STOCK',
+          details: `Dish "${item.name}" marked as ${nextState ? 'Available / In-Stock' : 'OUT OF STOCK'}`,
+          type: 'menu',
+          color: nextState ? 'emerald' : 'rose'
+        });
+        return { ...item, is_available: nextState };
+      }
+      return item;
+    });
     setMenuItems(updated);
     setLocalStore('menu_items', updated);
+  };
+
+  const handleApplyDiscount = (itemId, percent) => {
+    const p = Number(percent) || 0;
+    const updated = menuItems.map(item => {
+      if (item.id === itemId) {
+        const origPrice = Number(item.originalPrice || item.price || 0);
+        const discountAmt = Math.round((origPrice * p) / 100);
+        const finalPrice = Math.max(0, origPrice - discountAmt);
+        return {
+          ...item,
+          originalPrice: origPrice,
+          finalPrice: finalPrice,
+          price: finalPrice,
+          hasDiscount: true,
+          discountPercent: p
+        };
+      }
+      return item;
+    });
+    setMenuItems(updated);
+    setLocalStore('menu_items', updated);
+    const affectedItem = menuItems.find(i => i.id === itemId);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: 'Menu',
+      actionType: 'DISCOUNT_APPLIED',
+      details: `Applied ${p}% discount on "${affectedItem?.name || itemId}" (Discounted Price: ₹${Math.max(0, Math.round((affectedItem?.originalPrice || affectedItem?.price || 0) * (1 - p/100)))})`,
+      type: 'menu',
+      color: 'rose'
+    });
+    playSound('success');
+  };
+
+  const handleRemoveDiscount = (itemId) => {
+    const updated = menuItems.map(item => {
+      if (item.id === itemId) {
+        const origPrice = Number(item.originalPrice || item.price || 0);
+        return {
+          ...item,
+          finalPrice: origPrice,
+          price: origPrice,
+          hasDiscount: false,
+          discountPercent: 0
+        };
+      }
+      return item;
+    });
+    setMenuItems(updated);
+    setLocalStore('menu_items', updated);
+    const affectedItem = menuItems.find(i => i.id === itemId);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: 'Menu',
+      actionType: 'DISCOUNT_REMOVED',
+      details: `Removed discount on "${affectedItem?.name || itemId}". Restored original price ₹${affectedItem?.originalPrice || affectedItem?.price}`,
+      type: 'menu',
+      color: 'slate'
+    });
+    playSound('success');
+  };
+
+  const handleUpdateMenuItem = (updatedItem) => {
+    const updated = menuItems.map(item => item.id === updatedItem.id ? updatedItem : item);
+    setMenuItems(updated);
+    setLocalStore('menu_items', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: 'Menu',
+      actionType: 'MENU_ITEM_UPDATED',
+      details: `Updated dish "${updatedItem.name}" (Price: ₹${updatedItem.finalPrice || updatedItem.price})`,
+      type: 'menu',
+      color: 'orange'
+    });
+    playSound('success');
   };
 
   const handleAddMenuItem = (itemData) => {
     const itemObj = {
       ...itemData,
       id: `m_${Date.now()}`,
+      originalPrice: Number(itemData.price),
+      finalPrice: Number(itemData.price),
+      hasDiscount: false,
+      discountPercent: 0,
       orders_count: 0
     };
     const updated = [...menuItems, itemObj];
     setMenuItems(updated);
     setLocalStore('menu_items', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: 'Menu',
+      actionType: 'DISH_ADDED',
+      details: `Created new dish "${itemObj.name}" in category "${itemObj.category}" (₹${itemObj.price})`,
+      type: 'menu',
+      color: 'emerald'
+    });
     playSound('success');
   };
 
   const handleDeleteMenuItem = (id) => {
-    if (!window.confirm('Remove this dish from the menu?')) return;
+    const targetItem = menuItems.find(item => item.id === id);
+    if (!window.confirm(`Remove "${targetItem?.name || 'this dish'}" from the menu?`)) return;
     const updated = menuItems.filter(item => item.id !== id);
     setMenuItems(updated);
     setLocalStore('menu_items', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: authUser?.role || 'Admin',
+      tableNumber: 'Menu',
+      actionType: 'DISH_DELETED',
+      details: `Deleted dish "${targetItem?.name || id}" from menu`,
+      type: 'menu',
+      color: 'rose'
+    });
   };
 
   const handleAddEmployee = (empData) => {
     const updated = [...employees, empData];
     setEmployees(updated);
     setLocalStore('employees', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: 'Admin / Owner',
+      tableNumber: 'System',
+      actionType: 'CREDENTIAL_GENERATED',
+      details: `Generated login credentials for ${empData.name} (Role: ${empData.role}, Username: ${empData.username})`,
+      type: 'staff',
+      color: 'indigo'
+    });
+    playSound('success');
+  };
+
+  const handleDeleteEmployee = (empId, empName) => {
+    if (!window.confirm(`Are you sure you want to delete staff credentials for ${empName || 'this employee'}?`)) return;
+    const updated = employees.filter(e => e.id !== empId);
+    setEmployees(updated);
+    setLocalStore('employees', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Darshit Rana',
+      employeeRole: 'Admin / Owner',
+      tableNumber: 'System',
+      actionType: 'CREDENTIAL_DELETED',
+      details: `Deleted login credentials for ${empName || empId}`,
+      type: 'staff',
+      color: 'rose'
+    });
     playSound('success');
   };
 
@@ -217,6 +444,15 @@ export default function App() {
     const updated = [...coupons, couponData];
     setCoupons(updated);
     setLocalStore('coupons', updated);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: 'Admin / Owner',
+      tableNumber: 'Promo',
+      actionType: 'COUPON_CREATED',
+      details: `Created promo coupon "${couponData.code}" (${couponData.discount}${couponData.type === 'percentage' ? '%' : '₹'} off)`,
+      type: 'promo',
+      color: 'amber'
+    });
     playSound('success');
   };
 
@@ -239,6 +475,7 @@ export default function App() {
         setCurrentTable={setCurrentTable}
         categories={categories}
         menuItems={menuItems}
+        orders={orders}
         coupons={coupons}
         onPlaceOrder={handlePlaceCustomerOrder}
         currentLang={currentLang}
@@ -641,7 +878,10 @@ export default function App() {
             <OrdersView
               orders={orders}
               onUpdateStatus={handleUpdateOrderStatus}
+              onMarkCashPaymentDone={handleMarkCashPaymentDone}
+              onCancelOrderWithReason={handleCancelOrderWithReason}
               onAddNewOrder={() => setViewMode('customer')}
+              currentStaff={{ name: authUser?.name || 'Darshit Rana', role: authUser?.role || 'Admin' }}
               currentLang={currentLang}
             />
           )}
@@ -676,7 +916,10 @@ export default function App() {
               menuItems={menuItems}
               onToggleStock={handleToggleStock}
               onAddMenuItem={handleAddMenuItem}
+              onUpdateMenuItem={handleUpdateMenuItem}
               onDeleteMenuItem={handleDeleteMenuItem}
+              onApplyDiscount={handleApplyDiscount}
+              onRemoveDiscount={handleRemoveDiscount}
               currentLang={currentLang}
             />
           )}
@@ -684,7 +927,9 @@ export default function App() {
           {activeTab === 'employees' && (
             <EmployeesView
               employees={employees}
+              activity={activity}
               onAddEmployee={handleAddEmployee}
+              onDeleteEmployee={handleDeleteEmployee}
               currentLang={currentLang}
             />
           )}

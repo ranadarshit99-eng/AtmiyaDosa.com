@@ -17,7 +17,7 @@ export const COLLECTIONS = {
   PROMOTIONS: 'promotions',
   ORDERS: 'orders',
   EMPLOYEES: 'employees',
-  ACTIVITY: 'activity',
+  ACTIVITY: 'employee_activities',
   SETTINGS: 'settings'
 };
 
@@ -41,11 +41,72 @@ export const setLocalStore = (key, value) => {
   }
 };
 
+// Activity Recording Helper (Section 1.2 of Admin.txt)
+export const recordEmployeeActivity = (
+  employeeNameOrObj, 
+  employeeRole = 'Admin', 
+  actionType = 'GENERAL_ACTION', 
+  details = '', 
+  tableNumber = null, 
+  orderId = null, 
+  amount = null, 
+  paymentMethod = null
+) => {
+  let name = employeeNameOrObj;
+  let role = employeeRole;
+  let action = actionType;
+  let det = details;
+  let tbl = tableNumber;
+  let ord = orderId;
+  let amt = amount;
+  let payMethod = paymentMethod;
+
+  if (typeof employeeNameOrObj === 'object' && employeeNameOrObj !== null) {
+    name = employeeNameOrObj.employeeName || 'Darshit Rana';
+    role = employeeNameOrObj.employeeRole || 'Admin';
+    action = employeeNameOrObj.actionType || 'GENERAL_ACTION';
+    det = employeeNameOrObj.details || employeeNameOrObj.text || '';
+    tbl = employeeNameOrObj.tableNumber || null;
+    ord = employeeNameOrObj.orderId || null;
+    amt = employeeNameOrObj.amount || null;
+    payMethod = employeeNameOrObj.paymentMethod || null;
+  }
+
+  const currentActivity = getLocalStore('activity', INITIAL_ACTIVITY);
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const newEntry = {
+    id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    time: timeStr,
+    timestamp: now.toISOString(),
+    employeeName: name || 'Darshit Rana',
+    employeeRole: role || 'Admin',
+    actionType: action,
+    tableNumber: tbl,
+    orderId: ord,
+    amount: amt,
+    paymentMethod: payMethod,
+    details: det,
+    text: det,
+    type: action.toLowerCase().includes('payment') ? 'payment' : action.toLowerCase().includes('order') ? 'order' : 'staff',
+    color: action.toLowerCase().includes('payment') ? 'emerald' : action.toLowerCase().includes('cancel') ? 'rose' : 'orange'
+  };
+
+  const updated = [newEntry, ...currentActivity.slice(0, 99)];
+  setLocalStore('activity', updated);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('restaurant_data_updated'));
+  }
+  return updated;
+};
+
 // Auth Management Helpers
 export const getAuthUser = () => {
   return getLocalStore('auth_user', {
     id: 'usr_admin',
     name: 'Darshit Rana',
+    username: 'admin',
     email: 'admin@atmiyadosa.com',
     role: 'Admin',
     restaurantName: 'Atmiya Dosa Hub'
@@ -93,125 +154,216 @@ export const INITIAL_TABLES = [
 ];
 
 export const INITIAL_CATEGORIES = [
-  { id: 'cat_mysore', name: 'Mysore Dosa', percentage: 30, icon: 'Flame' },
-  { id: 'cat_fancy', name: 'Fancy Dosa', percentage: 25, icon: 'Sparkles' },
-  { id: 'cat_masala', name: 'Masala Dosa', percentage: 20, icon: 'Utensils' },
+  { id: 'cat_mysore', name: 'Mysore Dosa', percentage: 38, icon: 'Flame' },
+  { id: 'cat_fancy', name: 'Fancy Dosa', percentage: 28, icon: 'Sparkles' },
+  { id: 'cat_masala', name: 'Masala Dosa', percentage: 16, icon: 'Utensils' },
   { id: 'cat_paper', name: 'Plain Paper Dosa', percentage: 10, icon: 'Leaf' },
-  { id: 'cat_pavbhaji', name: 'Pav Bhaji & Pulao', percentage: 8, icon: 'UtensilsCrossed' },
-  { id: 'cat_chinese', name: 'Chinese & Starters', percentage: 7, icon: 'ShoppingBag' }
+  { id: 'cat_pavbhaji', name: 'Pav Bhaji & Pulao', percentage: 5, icon: 'UtensilsCrossed' },
+  { id: 'cat_chinese', name: 'Chinese & Starters', percentage: 3, icon: 'ShoppingBag' }
 ];
 
+// Menu items with authoritative originalPrice, finalPrice, and discount support (Section 4 of Admin.txt)
 export const INITIAL_MENU_ITEMS = [
   // Mysore Dosa
   {
     id: 'm_mysore_masala',
     name: 'Mysore Masala Dosa (માયસોર મસાલા)',
     category: 'Mysore Dosa',
+    originalPrice: 130,
+    finalPrice: 130,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 130,
     description: 'Crispy dosa coated with spicy Mysore chutney and loaded with seasoned potato masala.',
     image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 142
+    orders_count: 342,
+    prepTimeMins: 10,
+    rating: 4.9
   },
   {
     id: 'm_paneer_mysore',
     name: 'Paneer Mysore Dosa (પનીર માયસોર)',
     category: 'Mysore Dosa',
-    price: 150,
+    originalPrice: 150,
+    finalPrice: 128,
+    hasDiscount: true,
+    discountPercent: 15,
+    price: 128,
     description: 'Fresh malai paneer grated generously over hot spicy Mysore spread.',
     image_url: 'https://images.unsplash.com/photo-1567184109411-b28f21ee097a?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 98
+    orders_count: 289,
+    prepTimeMins: 10,
+    rating: 4.8
   },
   {
     id: 'm_cheese_mysore',
     name: 'Cheese Mysore Dosa (ચીઝ માયસોર)',
     category: 'Mysore Dosa',
+    originalPrice: 160,
+    finalPrice: 160,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 160,
     description: 'Loaded with melted Amul cheese and signature Mysore red chutney.',
     image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: false,
     is_available: true,
-    orders_count: 85
+    orders_count: 264,
+    prepTimeMins: 11,
+    rating: 4.8
   },
   {
     id: 'm_sp_atmiya_mysore',
     name: 'S.P. Atmiya Mysore (સ્પે. આત્મીય માયસોર)',
     category: 'Mysore Dosa',
+    originalPrice: 210,
+    finalPrice: 210,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 210,
     description: 'House specialty with dry fruits, paneer, double cheese, and royal Mysore gravy.',
     image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 110
+    orders_count: 230,
+    prepTimeMins: 13,
+    rating: 4.9
   },
   {
     id: 'm_cheese_bhurji_mysore',
     name: 'Cheese Bhurji Mysore (ચીઝ ભુરજી માયસોર)',
     category: 'Mysore Dosa',
+    originalPrice: 230,
+    finalPrice: 230,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 230,
     description: 'Tossed cheese bhurji stuffing with fresh capsicum and rich butter.',
     image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 67
+    orders_count: 198,
+    prepTimeMins: 12,
+    rating: 4.8
   },
 
   // Fancy Dosa
   {
+    id: 'm_bahubali_dosa',
+    name: 'Bahubali Dosa (બાહુબલી ઢોસા)',
+    category: 'Fancy Dosa',
+    originalPrice: 350,
+    finalPrice: 298,
+    hasDiscount: true,
+    discountPercent: 15,
+    price: 298,
+    description: 'Colossal king-size dosa loaded with 4 varieties of gravies, paneer tikka, and triple cheese.',
+    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
+    is_veg: true,
+    is_spicy: true,
+    is_available: true,
+    orders_count: 175,
+    prepTimeMins: 16,
+    rating: 4.9
+  },
+  {
     id: 'm_jini_roll',
     name: 'Jini Roll Dosa (જીની રોલ)',
     category: 'Fancy Dosa',
+    originalPrice: 200,
+    finalPrice: 200,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 200,
     description: 'Street-style vegetable stuffing topped with molten cheese, rolled and cut into upright bite pieces.',
     image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 124
+    orders_count: 215,
+    prepTimeMins: 12,
+    rating: 4.8
   },
   {
     id: 'm_chinese_dosa',
     name: 'Chinese Dosa (ચાઈનીઝ ઢોંસા)',
     category: 'Fancy Dosa',
+    originalPrice: 200,
+    finalPrice: 200,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 200,
     description: 'Indo-Chinese fusion with crunchy cabbage, capsicum, noodles, and Schezwan sauce.',
     image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 92
+    orders_count: 160,
+    prepTimeMins: 11,
+    rating: 4.7
   },
   {
     id: 'm_spring_roll_dosa',
     name: 'Spring Roll Dosa (સ્પ્રિંગ રોલ)',
     category: 'Fancy Dosa',
+    originalPrice: 250,
+    finalPrice: 250,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 250,
     description: 'Crispy cylindrical rolls loaded with veggies, cheese, and spicy dip.',
     image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 88
+    orders_count: 140,
+    prepTimeMins: 13,
+    rating: 4.8
   },
   {
     id: 'm_gotala_dosa',
     name: 'Surti Gotala Dosa (ગોટાલા ઢોંસા)',
     category: 'Fancy Dosa',
+    originalPrice: 220,
+    finalPrice: 220,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 220,
     description: 'Surat famous thick tomato-onion spiced gravy topped with crushed crispy dosa and cheese.',
     image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 135
+    orders_count: 180,
+    prepTimeMins: 14,
+    rating: 4.9
+  },
+  {
+    id: 'm_mataka_dosa',
+    name: 'Mataka Dosa (મટકા ઢોસા)',
+    category: 'Fancy Dosa',
+    originalPrice: 300,
+    finalPrice: 300,
+    hasDiscount: false,
+    discountPercent: 0,
+    price: 300,
+    description: 'Slow-cooked bubbling cheese vegetable gravy served inside an authentic terracotta matka pot with dosa.',
+    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
+    is_veg: true,
+    is_spicy: true,
+    is_available: true,
+    orders_count: 120,
+    prepTimeMins: 15,
+    rating: 4.9
   },
 
   // Plain & Paper Dosa
@@ -219,51 +371,37 @@ export const INITIAL_MENU_ITEMS = [
     id: 'm_plain_paper',
     name: 'Plain Paper Dosa (પ્લેન પેપર)',
     category: 'Plain Paper Dosa',
+    originalPrice: 60,
+    finalPrice: 60,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 60,
     description: 'Super wafer-thin, large golden crispy crepe served with sambar and coconut dip.',
     image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: false,
     is_available: true,
-    orders_count: 75
+    orders_count: 210,
+    prepTimeMins: 8,
+    rating: 4.7
   },
   {
     id: 'm_cheese_paper',
     name: 'Cheese Paper Dosa (ચીઝ પેપર)',
     category: 'Plain Paper Dosa',
+    originalPrice: 90,
+    finalPrice: 90,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 90,
     description: 'Thin crispy paper dosa brushed with butter and covered with melted Amul cheese.',
     image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: false,
     is_available: true,
-    orders_count: 62
-  },
-
-  // Special Items
-  {
-    id: 'm_bahubali_dosa',
-    name: 'Bahubali Dosa (બાહુબલી ઢોસા)',
-    category: 'Fancy Dosa',
-    price: 350,
-    description: 'Colossal king-size dosa loaded with 4 varieties of gravies, paneer tikka, and triple cheese.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 53
-  },
-  {
-    id: 'm_mataka_dosa',
-    name: 'Mataka Dosa (મટકા ઢોસા)',
-    category: 'Fancy Dosa',
-    price: 300,
-    description: 'Slow-cooked bubbling cheese vegetable gravy served inside an authentic terracotta matka pot with dosa.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 71
+    orders_count: 170,
+    prepTimeMins: 9,
+    rating: 4.8
   },
 
   // Pav Bhaji & Pulao
@@ -271,37 +409,55 @@ export const INITIAL_MENU_ITEMS = [
     id: 'm_butter_pav_bhaji',
     name: 'Amul Butter Pav Bhaji (બટર પાંઉભાજી)',
     category: 'Pav Bhaji & Pulao',
+    originalPrice: 80,
+    finalPrice: 80,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 80,
     description: 'Thick mashed vegetable curry slow-simmered with aromatic spices, served with 2 buttery pav buns.',
     image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 140
+    orders_count: 195,
+    prepTimeMins: 8,
+    rating: 4.8
   },
   {
     id: 'm_cheese_pav_bhaji',
     name: 'Cheese Pav Bhaji (ચીઝ પાંઉભાજી)',
     category: 'Pav Bhaji & Pulao',
+    originalPrice: 140,
+    finalPrice: 140,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 140,
     description: 'Butter pav bhaji smothered with mountain of grated cheese.',
     image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 88
+    orders_count: 130,
+    prepTimeMins: 9,
+    rating: 4.8
   },
   {
     id: 'm_sp_atmiya_pulao',
     name: 'Sp. Atmiya Pulao (સ્પે. આત્મીય પુલાવ)',
     category: 'Pav Bhaji & Pulao',
+    originalPrice: 150,
+    finalPrice: 150,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 150,
     description: 'Basmati rice tossed with roasted cashews, paneer chunks, green peas, and rich desi ghee.',
     image_url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: false,
     is_available: true,
-    orders_count: 65
+    orders_count: 95,
+    prepTimeMins: 10,
+    rating: 4.7
   },
 
   // Chinese Starters & Noodles
@@ -309,33 +465,47 @@ export const INITIAL_MENU_ITEMS = [
     id: 'm_manchurian_dry',
     name: 'Veg Manchurian Dry (મન્ચુરીયન ડ્રાય)',
     category: 'Chinese & Starters',
+    originalPrice: 120,
+    finalPrice: 120,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 120,
     description: 'Crisp vegetable dumplings tossed in garlic, ginger, soya, and spring onions.',
     image_url: 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: true,
     is_available: true,
-    orders_count: 82
+    orders_count: 110,
+    prepTimeMins: 11,
+    rating: 4.8
   },
   {
     id: 'm_hakka_noodles',
     name: 'Hakka Noodles (હક્કા નુડલ્સ)',
     category: 'Chinese & Starters',
+    originalPrice: 120,
+    finalPrice: 120,
+    hasDiscount: false,
+    discountPercent: 0,
     price: 120,
     description: 'Wok-tossed noodles with julienne veggies, white pepper, and light soya sauce.',
     image_url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80',
     is_veg: true,
     is_spicy: false,
     is_available: true,
-    orders_count: 73
+    orders_count: 90,
+    prepTimeMins: 10,
+    rating: 4.7
   }
 ];
 
+// Real Orders with Payment Logic & Wait Time (Sections 2, 7 & 8 of Admin.txt)
 export const INITIAL_ORDERS = [
   {
     id: '#ORD1048',
     table_number: 'T04',
     customer_name: 'Rahul Sharma',
+    order_source: 'Dine-In',
     items: [
       { id: 'm_mysore_masala', name: 'Mysore Masala Dosa', price: 130, qty: 2 },
       { id: 'm_coke', name: 'Cold Drink', price: 40, qty: 1 }
@@ -348,12 +518,18 @@ export const INITIAL_ORDERS = [
     status: 'Preparing',
     tab_type: 'ongoing',
     time: '11:32 AM',
-    payment_mode: 'UPI'
+    placed_at: '2026-10-14T11:32:00Z',
+    payment_mode: 'UPI',
+    payment_status: 'Paid',
+    payment_verified_online: true,
+    paid_collected_by: 'UPI Gateway Direct',
+    cancel_reason: null
   },
   {
     id: '#ORD1047',
     table_number: 'T07',
     customer_name: 'Anjali Patel',
+    order_source: 'Dine-In',
     items: [
       { id: 'm_cheese_mysore', name: 'Cheese Mysore Dosa', price: 160, qty: 1 },
       { id: 'm_plain_paper', name: 'Plain Paper Dosa', price: 60, qty: 2 }
@@ -366,12 +542,18 @@ export const INITIAL_ORDERS = [
     status: 'Ready',
     tab_type: 'ongoing',
     time: '11:18 AM',
-    payment_mode: 'UPI'
+    placed_at: '2026-10-14T11:18:00Z',
+    payment_mode: 'UPI',
+    payment_status: 'Paid',
+    payment_verified_online: true,
+    paid_collected_by: 'UPI Gateway Direct',
+    cancel_reason: null
   },
   {
     id: '#ORD1046',
     table_number: 'T11',
     customer_name: 'Suresh Mehta',
+    order_source: 'Dine-In',
     items: [
       { id: 'm_gotala_dosa', name: 'Surti Gotala Dosa', price: 220, qty: 1 }
     ],
@@ -383,12 +565,65 @@ export const INITIAL_ORDERS = [
     status: 'Cooking',
     tab_type: 'ongoing',
     time: '10:56 AM',
-    payment_mode: 'Cash'
+    placed_at: '2026-10-14T10:56:00Z',
+    payment_mode: 'Cash',
+    payment_status: 'Pending',
+    payment_verified_online: false,
+    paid_collected_by: null,
+    cancel_reason: null
+  },
+  {
+    id: '#ORD1049',
+    table_number: 'Online-Zomato',
+    customer_name: 'Priya Shah (Zomato #Z8941)',
+    order_source: 'Zomato',
+    items: [
+      { id: 'm_bahubali_dosa', name: 'Bahubali Dosa', price: 298, qty: 1 },
+      { id: 'm_butter_pav_bhaji', name: 'Amul Butter Pav Bhaji', price: 80, qty: 1 }
+    ],
+    items_summary: '1x Bahubali Dosa, 1x Butter Pav Bhaji',
+    subtotal: 378,
+    tax: 19,
+    discount: 0,
+    total_amount: 397,
+    status: 'Cooking',
+    tab_type: 'ongoing',
+    time: '11:40 AM',
+    placed_at: '2026-10-14T11:40:00Z',
+    payment_mode: 'Online (Prepaid)',
+    payment_status: 'Paid',
+    payment_verified_online: true,
+    paid_collected_by: 'Zomato Merchant Settle',
+    cancel_reason: null
+  },
+  {
+    id: '#ORD1050',
+    table_number: 'Online-Swiggy',
+    customer_name: 'Ketan Patel (Swiggy #S204)',
+    order_source: 'Swiggy',
+    items: [
+      { id: 'm_paneer_mysore', name: 'Paneer Mysore Dosa', price: 128, qty: 2 }
+    ],
+    items_summary: '2x Paneer Mysore Dosa',
+    subtotal: 256,
+    tax: 13,
+    discount: 0,
+    total_amount: 269,
+    status: 'Placed',
+    tab_type: 'ongoing',
+    time: '11:44 AM',
+    placed_at: '2026-10-14T11:44:00Z',
+    payment_mode: 'Online (Prepaid)',
+    payment_status: 'Paid',
+    payment_verified_online: true,
+    paid_collected_by: 'Swiggy Pay',
+    cancel_reason: null
   },
   {
     id: '#ORD1045',
     table_number: 'T02',
     customer_name: 'Vikram Joshi',
+    order_source: 'Dine-In',
     items: [
       { id: 'm_mysore_masala', name: 'Mysore Masala Dosa', price: 130, qty: 2 },
       { id: 'm_butter_pav_bhaji', name: 'Amul Butter Pav Bhaji', price: 80, qty: 1 }
@@ -401,30 +636,18 @@ export const INITIAL_ORDERS = [
     status: 'Served',
     tab_type: 'ongoing',
     time: '10:42 AM',
-    payment_mode: 'Card'
-  },
-  {
-    id: '#ORD1044',
-    table_number: 'T09',
-    customer_name: 'Pooja Bhatt',
-    items: [
-      { id: 'm_jini_roll', name: 'Jini Roll Dosa', price: 200, qty: 1 },
-      { id: 'm_manchurian_dry', name: 'Veg Manchurian Dry', price: 120, qty: 1 }
-    ],
-    items_summary: '1x Jini Roll, 1x Manchurian Dry',
-    subtotal: 320,
-    tax: 16,
-    discount: 0,
-    total_amount: 336,
-    status: 'Preparing',
-    tab_type: 'ongoing',
-    time: '10:28 AM',
-    payment_mode: 'UPI'
+    placed_at: '2026-10-14T10:42:00Z',
+    payment_mode: 'Cash',
+    payment_status: 'Paid',
+    payment_verified_online: false,
+    paid_collected_by: 'Anjali Patel (Cashier)',
+    cancel_reason: null
   },
   {
     id: '#ORD1043',
     table_number: 'T06',
     customer_name: 'Kiran Shah',
+    order_source: 'Dine-In',
     items: [
       { id: 'm_cheese_bhurji_mysore', name: 'Cheese Bhurji Mysore', price: 230, qty: 2 }
     ],
@@ -436,28 +659,108 @@ export const INITIAL_ORDERS = [
     status: 'Completed',
     tab_type: 'completed',
     time: '09:55 AM',
-    payment_mode: 'UPI'
+    placed_at: '2026-10-14T09:55:00Z',
+    payment_mode: 'UPI',
+    payment_status: 'Paid',
+    payment_verified_online: true,
+    paid_collected_by: 'UPI Gateway Direct',
+    cancel_reason: null
   }
 ];
 
+// Immutable Activity Audit Log (Section 1.2 of Admin.txt)
 export const INITIAL_ACTIVITY = [
-  { id: 'act1', time: '11:35 AM', type: 'order', text: 'Order #ORD1048 placed at Table 04 by Rahul Sharma', icon: 'ShoppingBag', color: 'orange' },
-  { id: 'act2', time: '11:22 AM', type: 'payment', text: 'Payment received (UPI) ₹260 by Anjali Patel', icon: 'IndianRupee', color: 'emerald' },
-  { id: 'act3', time: '11:18 AM', type: 'kitchen', text: 'Order #ORD1047 marked as Ready by Kitchen Staff', icon: 'ChefHat', color: 'amber' },
-  { id: 'act4', time: '11:05 AM', type: 'table', text: 'Table 09 session closed by Riya (Waiter)', icon: 'Users', color: 'blue' },
-  { id: 'act5', time: '10:52 AM', type: 'staff', text: 'New employee added (name: amit)', icon: 'UserCheck', color: 'indigo' }
+  { 
+    id: 'act1', 
+    time: '11:42 AM', 
+    timestamp: '2026-10-14T11:42:00Z',
+    type: 'payment', 
+    employeeName: 'Anjali Patel',
+    employeeRole: 'Cashier & POS Lead',
+    tableNumber: 'T02',
+    actionType: 'PAYMENT_COLLECTED_CASH',
+    amount: 357,
+    paymentMethod: 'Cash',
+    details: 'Cash payment of ₹357 for Table 02 manually collected & confirmed by Anjali Patel',
+    text: 'Cash payment of ₹357 for Table 02 manually collected & confirmed by Anjali Patel',
+    color: 'emerald'
+  },
+  { 
+    id: 'act2', 
+    time: '11:35 AM', 
+    timestamp: '2026-10-14T11:35:00Z',
+    type: 'order', 
+    employeeName: 'System / QR Self-Order',
+    employeeRole: 'Guest Service',
+    tableNumber: 'T04',
+    actionType: 'ORDER_PLACED_QR',
+    amount: 315,
+    paymentMethod: 'UPI',
+    details: 'Order #ORD1048 placed via QR at Table 04 by Rahul Sharma (UPI Paid ₹315)',
+    text: 'Order #ORD1048 placed via QR at Table 04 by Rahul Sharma (UPI Paid ₹315)',
+    color: 'orange'
+  },
+  { 
+    id: 'act3', 
+    time: '11:20 AM', 
+    timestamp: '2026-10-14T11:20:00Z',
+    type: 'staff', 
+    employeeName: 'Darshit Rana',
+    employeeRole: 'Admin / Owner',
+    tableNumber: 'System',
+    actionType: 'CREDENTIAL_GENERATED',
+    amount: null,
+    paymentMethod: null,
+    details: 'Generated new staff login credentials for Anjali Patel (Role: Cashier)',
+    text: 'Generated new staff login credentials for Anjali Patel (Role: Cashier)',
+    color: 'indigo'
+  },
+  { 
+    id: 'act4', 
+    time: '11:18 AM', 
+    timestamp: '2026-10-14T11:18:00Z',
+    type: 'kitchen', 
+    employeeName: 'Amit Kumar',
+    employeeRole: 'Head Chef',
+    tableNumber: 'T07',
+    actionType: 'KDS_ORDER_READY',
+    amount: null,
+    paymentMethod: null,
+    details: 'Order #ORD1047 marked as Ready for pickup by Amit Kumar',
+    text: 'Order #ORD1047 marked as Ready for pickup by Amit Kumar',
+    color: 'amber'
+  },
+  { 
+    id: 'act5', 
+    time: '11:05 AM', 
+    timestamp: '2026-10-14T11:05:00Z',
+    type: 'table', 
+    employeeName: 'Riya Patel',
+    employeeRole: 'Senior Waiter',
+    tableNumber: 'T09',
+    actionType: 'TABLE_SERVED',
+    amount: null,
+    paymentMethod: null,
+    details: 'Table 09 food served and guest dining session initiated by Riya Patel',
+    text: 'Table 09 food served and guest dining session initiated by Riya Patel',
+    color: 'blue'
+  }
 ];
 
+// Staff Credentials with creation & deletion support (Section 1 of Admin.txt)
 export const INITIAL_EMPLOYEES = [
-  { id: 'emp1', name: 'Darshit Rana', role: 'Admin / Owner', phone: '+91 63530 59221', shift: 'Full Day', active: true },
-  { id: 'emp2', name: 'Amit Kumar', role: 'Head Chef', phone: '+91 97123 45678', shift: 'Morning Shift', active: true },
-  { id: 'emp3', name: 'Riya Patel', role: 'Senior Waiter', phone: '+91 99245 67890', shift: 'Morning Shift', active: true },
-  { id: 'emp4', name: 'Anjali Patel', role: 'Cashier & POS Lead', phone: '+91 98980 11223', shift: 'Evening Shift', active: true },
-  { id: 'emp5', name: 'Rohan Verma', role: 'Kitchen Helper', phone: '+91 98220 55667', shift: 'Evening Shift', active: true }
+  { id: 'emp1', name: 'Darshit Rana', username: 'admin', role: 'Admin / Owner', password: 'password123', phone: '+91 63530 59221', shift: 'Full Day', active: true, createdAt: '2026-09-01' },
+  { id: 'emp2', name: 'Amit Kumar', username: 'chef_amit', role: 'Head Chef', password: 'password123', phone: '+91 97123 45678', shift: 'Morning Shift', active: true, createdAt: '2026-09-10' },
+  { id: 'emp3', name: 'Riya Patel', username: 'waiter_riya', role: 'Senior Waiter', password: 'password123', phone: '+91 99245 67890', shift: 'Morning Shift', active: true, createdAt: '2026-09-15' },
+  { id: 'emp4', name: 'Anjali Patel', username: 'cashier_anjali', role: 'Cashier & POS Lead', password: 'password123', phone: '+91 98980 11223', shift: 'Evening Shift', active: true, createdAt: '2026-10-01' },
+  { id: 'emp5', name: 'Rohan Verma', username: 'kitchen_rohan', role: 'Kitchen Helper', password: 'password123', phone: '+91 98220 55667', shift: 'Evening Shift', active: true, createdAt: '2026-10-05' }
 ];
 
+// Coupons (Section 5 of Admin.txt)
 export const INITIAL_COUPONS = [
   { id: 'c1', code: 'WELCOME50', discount: 50, type: 'flat', min_order: 250, active: true },
   { id: 'c2', code: 'DOSA20', discount: 20, type: 'percentage', min_order: 300, active: true },
   { id: 'c3', code: 'FESTIVE100', discount: 100, type: 'flat', min_order: 500, active: true }
 ];
+
+
