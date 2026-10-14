@@ -1,0 +1,30 @@
+{
+  "name": "hotel-management-suite",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Enterprise Restaurant POS, Kitchen KDS & Digital QR Ordering Suite",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "backend": "npm --prefix backend start",
+    "backend:dev": "npm --prefix backend run dev",
+    "seed": "npm --prefix backend run seed",
+    "test:connection": "npm --prefix backend run test-connection"
+  },
+  "keywords": [
+    "restaurant-pos",
+    "kitchen-kds",
+    "qr-ordering",
+    "appwrite",
+    "react",
+    "vite",
+    "petpooja"
+  ],
+  "author": "Darshit Rana",
+  "license": "MIT"
+}

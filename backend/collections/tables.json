@@ -1,0 +1,12 @@
+{
+  "name": "tables",
+  "id": "tables",
+  "attributes": [
+    { "key": "number", "type": "string", "required": true, "size": 32 },
+    { "key": "capacity", "type": "integer", "required": true },
+    { "key": "zone", "type": "string", "required": true, "size": 64 },
+    { "key": "status", "type": "string", "required": true, "size": 32 },
+    { "key": "current_order_id", "type": "string", "required": false, "size": 64 },
+    { "key": "timing", "type": "string", "required": false, "size": 32 }
+  ]
+}

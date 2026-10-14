@@ -1,0 +1,15 @@
+{
+  "name": "menu_items",
+  "id": "menu_items",
+  "attributes": [
+    { "key": "name", "type": "string", "required": true, "size": 128 },
+    { "key": "category", "type": "string", "required": true, "size": 64 },
+    { "key": "price", "type": "float", "required": true },
+    { "key": "description", "type": "string", "required": false, "size": 512 },
+    { "key": "image_url", "type": "string", "required": false, "size": 1024 },
+    { "key": "is_veg", "type": "boolean", "required": true },
+    { "key": "is_spicy", "type": "boolean", "required": true },
+    { "key": "is_available", "type": "boolean", "required": true },
+    { "key": "orders_count", "type": "integer", "required": false }
+  ]
+}

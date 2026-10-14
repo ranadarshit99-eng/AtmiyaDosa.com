@@ -1,0 +1,13 @@
+{
+  "name": "settings",
+  "id": "settings",
+  "attributes": [
+    { "key": "restaurantName", "type": "string", "required": true, "size": 128 },
+    { "key": "tagline", "type": "string", "required": false, "size": 256 },
+    { "key": "address", "type": "string", "required": false, "size": 512 },
+    { "key": "phone", "type": "string", "required": false, "size": 32 },
+    { "key": "gstin", "type": "string", "required": false, "size": 32 },
+    { "key": "currency", "type": "string", "required": true, "size": 8 },
+    { "key": "language", "type": "string", "required": true, "size": 16 }
+  ]
+}

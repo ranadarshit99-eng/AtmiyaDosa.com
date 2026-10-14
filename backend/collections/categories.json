@@ -1,0 +1,9 @@
+{
+  "name": "categories",
+  "id": "categories",
+  "attributes": [
+    { "key": "name", "type": "string", "required": true, "size": 64 },
+    { "key": "percentage", "type": "integer", "required": false },
+    { "key": "icon", "type": "string", "required": false, "size": 32 }
+  ]
+}

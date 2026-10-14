@@ -1,0 +1,20 @@
+{
+  "name": "hotel-management-backend",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Appwrite Cloud Backend & API Services for Restaurant POS",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node scripts/seed_database.js",
+    "test-connection": "node scripts/test_connection.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^14.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  }
+}

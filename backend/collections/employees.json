@@ -1,0 +1,11 @@
+{
+  "name": "employees",
+  "id": "employees",
+  "attributes": [
+    { "key": "name", "type": "string", "required": true, "size": 64 },
+    { "role": "string", "key": "role", "type": "string", "required": true, "size": 64 },
+    { "key": "phone", "type": "string", "required": true, "size": 32 },
+    { "key": "shift", "type": "string", "required": true, "size": 64 },
+    { "key": "active", "type": "boolean", "required": true }
+  ]
+}
