@@ -33,3 +33,13 @@ WhatsApp Image*.jpg
 .env
 .env.local
 .env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/

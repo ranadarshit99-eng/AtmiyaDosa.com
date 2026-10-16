@@ -1,0 +1,529 @@
+import asyncio
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any
+import httpx
+from app.config import settings
+from app.security import get_password_hash
+
+# -------------------------------------------------------------------------
+# CANONICAL IN-MEMORY REPOSITORY (SERVER OF RECORD)
+# -------------------------------------------------------------------------
+
+CANONICAL_MENU: Dict[str, Dict[str, Any]] = {
+    # Mysore Dosa
+    "item_atmiya_01": {
+        "id": "item_atmiya_01",
+        "name": "Mysore Masala Dosa",
+        "gujarati_name": "માયસોર મસાલા ઢોસા",
+        "price": 130.0,
+        "category": "Mysore Dosa",
+        "description": "Crisp golden dosa coated with spicy red garlic chutney, filled with potato bhaji.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 10,
+        "tags": ["Bestseller", "Spicy"]
+    },
+    "item_atmiya_02": {
+        "id": "item_atmiya_02",
+        "name": "Paneer Mysore Dosa",
+        "gujarati_name": "પનીર માયસોર ઢોસા",
+        "price": 150.0,
+        "category": "Mysore Dosa",
+        "description": "Stuffed with fresh malai paneer and Mysore spices.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 10,
+        "tags": ["Chef Special"]
+    },
+    "item_atmiya_03": {
+        "id": "item_atmiya_03",
+        "name": "Cheese Mysore Dosa",
+        "gujarati_name": "ચીઝ માયસોર ઢોસા",
+        "price": 160.0,
+        "category": "Mysore Dosa",
+        "description": "Generously loaded with melted Amul cheese and Mysore paste.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 11,
+        "tags": ["Kids Favorite"]
+    },
+    "item_atmiya_04": {
+        "id": "item_atmiya_04",
+        "name": "S.P. Atmiya Mysore",
+        "gujarati_name": "સ્પે. આત્મીય માયસોર",
+        "price": 210.0,
+        "category": "Mysore Dosa",
+        "description": "House signature double butter, paneer, dry fruits, and rich cheese filling.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 13,
+        "tags": ["Signature", "Must Try"]
+    },
+    "item_atmiya_05": {
+        "id": "item_atmiya_05",
+        "name": "Cheese Bhurji Mysore",
+        "gujarati_name": "ચીઝ ભુરજી માયસોર",
+        "price": 230.0,
+        "category": "Mysore Dosa",
+        "description": "Shredded paneer and Amul cheese tossed with capsicum and Mysore masala.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 12,
+        "tags": ["Rich"]
+    },
+
+    # Fancy Dosa
+    "item_atmiya_06": {
+        "id": "item_atmiya_06",
+        "name": "Jini Roll Dosa",
+        "gujarati_name": "જીની રોલ ઢોસા",
+        "price": 200.0,
+        "category": "Fancy Dosa",
+        "description": "Sliced crispy dosa rolls topped with sweet and spicy chutneys and shredded cheese.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 12,
+        "tags": ["Trending"]
+    },
+    "item_atmiya_07": {
+        "id": "item_atmiya_07",
+        "name": "Chinese Dosa",
+        "gujarati_name": "ચાઈનીઝ ઢોસા",
+        "price": 200.0,
+        "category": "Fancy Dosa",
+        "description": "Fusion dosa filled with Hakka noodles, cabbage, and Manchurian sauce.",
+        "is_available": True,
+        "is_jain_available": False,
+        "prep_time_mins": 12,
+        "tags": ["Fusion"]
+    },
+    "item_atmiya_08": {
+        "id": "item_atmiya_08",
+        "name": "Spring Roll Dosa",
+        "gujarati_name": "સ્પ્રિંગ રોલ ઢોસા",
+        "price": 250.0,
+        "category": "Fancy Dosa",
+        "description": "Crispy rolled dosa stuffed with sautéed Asian veggies and Schezwan sauce.",
+        "is_available": True,
+        "is_jain_available": False,
+        "prep_time_mins": 14,
+        "tags": ["Crunchy"]
+    },
+    "item_atmiya_09": {
+        "id": "item_atmiya_09",
+        "name": "Surti Gotala Dosa",
+        "gujarati_name": "સુરતી ગોટાળા ઢોસા",
+        "price": 220.0,
+        "category": "Fancy Dosa",
+        "description": "Surat specialty spicy gravy with mashed vegetables, paneer, and two crisp dosas.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 15,
+        "tags": ["Famous"]
+    },
+    "item_atmiya_10": {
+        "id": "item_atmiya_10",
+        "name": "Bahubali Dosa",
+        "gujarati_name": "બાહુબલી ઢોસા",
+        "price": 350.0,
+        "category": "Fancy Dosa",
+        "description": "Enormous family-sized grand dosa platter with four specialty gravies and rich toppings.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 18,
+        "tags": ["Family Pack", "Grand"]
+    },
+    "item_atmiya_11": {
+        "id": "item_atmiya_11",
+        "name": "Mataka Dosa",
+        "gujarati_name": "મટકા ઢોસા",
+        "price": 300.0,
+        "category": "Fancy Dosa",
+        "description": "Clay pot-infused steaming cheese-butter gravy poured over fresh rolled dosas.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 16,
+        "tags": ["Unique"]
+    },
+
+    # Plain & Paper Dosa
+    "item_atmiya_12": {
+        "id": "item_atmiya_12",
+        "name": "Plain Paper Dosa",
+        "gujarati_name": "સાદા પેપર ઢોસા",
+        "price": 60.0,
+        "category": "Plain Paper Dosa",
+        "description": "Classic thin, super-crispy wafer dosa served with coconut chutney and hot sambhar.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 7,
+        "tags": ["Classic"]
+    },
+    "item_atmiya_13": {
+        "id": "item_atmiya_13",
+        "name": "Butter Paper Dosa",
+        "gujarati_name": "બટર પેપર ઢોસા",
+        "price": 75.0,
+        "category": "Plain Paper Dosa",
+        "description": "Thin crispy paper dosa brushed with pure Amul butter.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 8,
+        "tags": ["Popular"]
+    },
+    "item_atmiya_14": {
+        "id": "item_atmiya_14",
+        "name": "Cheese Paper Dosa",
+        "gujarati_name": "ચીઝ પેપર ઢોસા",
+        "price": 90.0,
+        "category": "Plain Paper Dosa",
+        "description": "Crispy paper dosa filled with melted mozzarella and processed cheese.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 9,
+        "tags": ["Cheesy"]
+    },
+
+    # Pav Bhaji & Pulao
+    "item_atmiya_15": {
+        "id": "item_atmiya_15",
+        "name": "Amul Butter Pav Bhaji",
+        "gujarati_name": "અમૂલ બટર પાવભાજી",
+        "price": 80.0,
+        "category": "Pav Bhaji & Pulao",
+        "description": "Slow-cooked mashed vegetable gravy topped with Amul butter slab and toasted pavs.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 8,
+        "tags": ["Comfort Food"]
+    },
+    "item_atmiya_16": {
+        "id": "item_atmiya_16",
+        "name": "Cheese Pav Bhaji",
+        "gujarati_name": "ચીઝ પાવભાજી",
+        "price": 140.0,
+        "category": "Pav Bhaji & Pulao",
+        "description": "Creamy Pav Bhaji blanketed with grated Amul cheese.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 9,
+        "tags": ["Bestseller"]
+    },
+    "item_atmiya_17": {
+        "id": "item_atmiya_17",
+        "name": "Sp. Atmiya Pulao",
+        "gujarati_name": "સ્પે. આત્મીય પુલાવ",
+        "price": 150.0,
+        "category": "Pav Bhaji & Pulao",
+        "description": "Fragrant Basmati rice stir-fried on the tawa with aromatic spices, paneer, and veggies.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 10,
+        "tags": ["Tawa Pulao"]
+    },
+
+    # Chinese & Starters
+    "item_atmiya_18": {
+        "id": "item_atmiya_18",
+        "name": "Veg Manchurian Dry",
+        "gujarati_name": "વેજ મંચુરિયન ડ્રાય",
+        "price": 120.0,
+        "category": "Chinese & Starters",
+        "description": "Crispy vegetable dumplings tossed in garlic, ginger, and soy glaze.",
+        "is_available": True,
+        "is_jain_available": False,
+        "prep_time_mins": 10,
+        "tags": ["Starters"]
+    },
+    "item_atmiya_19": {
+        "id": "item_atmiya_19",
+        "name": "Hakka Noodles",
+        "gujarati_name": "હક્કા નૂડલ્સ",
+        "price": 120.0,
+        "category": "Chinese & Starters",
+        "description": "Wok-tossed noodles with crunchy capsicum, cabbage, and carrots.",
+        "is_available": True,
+        "is_jain_available": False,
+        "prep_time_mins": 10,
+        "tags": ["Wok Fresh"]
+    },
+    "item_atmiya_20": {
+        "id": "item_atmiya_20",
+        "name": "Paneer Chilli Dry",
+        "gujarati_name": "પનીર ચીલી ડ્રાય",
+        "price": 160.0,
+        "category": "Chinese & Starters",
+        "description": "Wok-seared paneer cubes with green chilies, bell peppers, and scallions.",
+        "is_available": True,
+        "is_jain_available": False,
+        "prep_time_mins": 11,
+        "tags": ["Spicy Starters"]
+    },
+
+    # Beverages
+    "item_atmiya_21": {
+        "id": "item_atmiya_21",
+        "name": "Masala Chaas",
+        "gujarati_name": "મસાલા છાશ",
+        "price": 25.0,
+        "category": "Beverages",
+        "description": "Chilled roasted-cumin spiced buttermilk.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 2,
+        "tags": ["Refreshing"]
+    },
+    "item_atmiya_22": {
+        "id": "item_atmiya_22",
+        "name": "Cold Drink",
+        "gujarati_name": "ઠંડુ પીણું",
+        "price": 40.0,
+        "category": "Beverages",
+        "description": "Assorted chilled sodas (Coke, Thums Up, Sprite - 300ml).",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 1,
+        "tags": ["Chilled"]
+    },
+    "item_atmiya_23": {
+        "id": "item_atmiya_23",
+        "name": "Packaged Water (1L)",
+        "gujarati_name": "મિનરલ વોટર",
+        "price": 20.0,
+        "category": "Beverages",
+        "description": "Sealed mineral water bottle.",
+        "is_available": True,
+        "is_jain_available": True,
+        "prep_time_mins": 1,
+        "tags": ["Essential"]
+    }
+}
+
+CANONICAL_CATEGORIES = [
+    {"id": "cat_mysore", "name": "Mysore Dosa", "icon": "Flame"},
+    {"id": "cat_fancy", "name": "Fancy Dosa", "icon": "Sparkles"},
+    {"id": "cat_paper", "name": "Plain Paper Dosa", "icon": "Layers"},
+    {"id": "cat_pavbhaji", "name": "Pav Bhaji & Pulao", "icon": "Soup"},
+    {"id": "cat_chinese", "name": "Chinese & Starters", "icon": "UtensilsCrossed"},
+    {"id": "cat_beverages", "name": "Beverages", "icon": "Coffee"}
+]
+
+CANONICAL_COUPONS = {
+    "WELCOME50": {"code": "WELCOME50", "discount": 50.0, "discount_type": "flat", "min_order": 250.0, "active": True, "description": "Flat ₹50 OFF on orders above ₹250"},
+    "DOSA20": {"code": "DOSA20", "discount": 20.0, "discount_type": "percentage", "min_order": 300.0, "active": True, "description": "20% OFF on orders above ₹300"},
+    "FESTIVE100": {"code": "FESTIVE100", "discount": 100.0, "discount_type": "flat", "min_order": 500.0, "active": True, "description": "Flat ₹100 OFF on festive orders above ₹500"}
+}
+
+# Initial Tables
+CANONICAL_TABLES: Dict[str, Dict[str, Any]] = {
+    f"T{i:02d}": {
+        "id": f"T{i:02d}",
+        "number": f"T{i:02d}",
+        "capacity": 4 if i <= 10 else (6 if i <= 14 else 8),
+        "zone": "Main Hall" if i <= 6 else ("AC Section" if i <= 10 else ("Patio Garden" if i <= 13 else "Family Section")),
+        "status": "occupied" if i in [2, 4, 7] else "available",
+        "current_order_id": "#ORD1048" if i == 4 else None,
+        "timing": "18m" if i == 4 else (None if i not in [2, 7] else "12m")
+    }
+    for i in range(1, 17)
+}
+
+# Initial Orders
+CANONICAL_ORDERS: List[Dict[str, Any]] = [
+    {
+        "id": "#ORD1048",
+        "table_number": "T04",
+        "customer_name": "Rahul Sharma",
+        "items": [
+            {"id": "item_atmiya_01", "name": "Mysore Masala Dosa", "price": 130.0, "qty": 2, "line_total": 260.0, "notes": "Medium spicy"},
+            {"id": "item_atmiya_22", "name": "Cold Drink", "price": 40.0, "qty": 1, "line_total": 40.0, "notes": "Chilled"}
+        ],
+        "items_summary": "2x Mysore Masala, 1x Cold Drink",
+        "subtotal": 300.0,
+        "discount": 0.0,
+        "tax": 15.0,
+        "total_amount": 315.0,
+        "status": "Preparing",
+        "payment_mode": "UPI",
+        "payment_status": "Paid",
+        "placed_at": datetime.now(timezone.utc).isoformat(),
+        "estimated_time_mins": 15
+    },
+    {
+        "id": "#ORD1047",
+        "table_number": "T02",
+        "customer_name": "Priya Shah",
+        "items": [
+            {"id": "item_atmiya_06", "name": "Jini Roll Dosa", "price": 200.0, "qty": 1, "line_total": 200.0, "notes": "Jain preparation"},
+            {"id": "item_atmiya_15", "name": "Amul Butter Pav Bhaji", "price": 80.0, "qty": 1, "line_total": 80.0, "notes": "Extra butter"}
+        ],
+        "items_summary": "1x Jini Roll, 1x Amul Butter Pav Bhaji",
+        "subtotal": 280.0,
+        "discount": 0.0,
+        "tax": 14.0,
+        "total_amount": 294.0,
+        "status": "Cooking",
+        "payment_mode": "Cash",
+        "payment_status": "Pending",
+        "placed_at": datetime.now(timezone.utc).isoformat(),
+        "estimated_time_mins": 12
+    }
+]
+
+# Initial Inventory
+CANONICAL_INVENTORY: Dict[str, Dict[str, Any]] = {
+    "inv_01": {"id": "inv_01", "name": "Dosa Batter (ખીરું)", "category": "Base Ingredients", "stock": 42.5, "unit": "kg", "threshold": 15.0, "cost_per_unit": 45.0, "supplier": "Fresh Daily Mills", "last_restocked": "Today 06:00 AM"},
+    "inv_02": {"id": "inv_02", "name": "Amul Butter (અમૂલ બટર)", "category": "Dairy", "stock": 8.0, "unit": "kg", "threshold": 5.0, "cost_per_unit": 540.0, "supplier": "Amul Parlour Petlad", "last_restocked": "Yesterday"},
+    "inv_03": {"id": "inv_03", "name": "Processed Cheese (ચીઝ)", "category": "Dairy", "stock": 3.2, "unit": "kg", "threshold": 4.0, "cost_per_unit": 480.0, "supplier": "Amul Parlour Petlad", "last_restocked": "2 days ago"},
+    "inv_04": {"id": "inv_04", "name": "Potatoes (બટાટા)", "category": "Vegetables", "stock": 35.0, "unit": "kg", "threshold": 10.0, "cost_per_unit": 25.0, "supplier": "Petlad Mandi", "last_restocked": "Today 07:00 AM"},
+    "inv_05": {"id": "inv_05", "name": "Tomatoes & Capsicum", "category": "Vegetables", "stock": 18.0, "unit": "kg", "threshold": 6.0, "cost_per_unit": 40.0, "supplier": "Petlad Mandi", "last_restocked": "Today 07:00 AM"},
+    "inv_06": {"id": "inv_06", "name": "Pav Buns (લાદી પાવ)", "category": "Bakery", "stock": 65.0, "unit": "pack", "threshold": 20.0, "cost_per_unit": 25.0, "supplier": "Surat Bakery", "last_restocked": "Today 06:30 AM"},
+    "inv_07": {"id": "inv_07", "name": "Mysore Special Masala", "category": "Spices", "stock": 6.5, "unit": "kg", "threshold": 2.0, "cost_per_unit": 350.0, "supplier": "House Blend", "last_restocked": "3 days ago"},
+    "inv_08": {"id": "inv_08", "name": "Sambhar Daal & Spices", "category": "Groceries", "stock": 25.0, "unit": "kg", "threshold": 8.0, "cost_per_unit": 160.0, "supplier": "Local Grain Store", "last_restocked": "This week"},
+    "inv_09": {"id": "inv_09", "name": "Cooking Oil (તેલ)", "category": "Oils", "stock": 28.0, "unit": "litres", "threshold": 10.0, "cost_per_unit": 140.0, "supplier": "Tirupati Oil Agency", "last_restocked": "Yesterday"}
+}
+
+# Pre-configured Staff credentials
+CANONICAL_STAFF: Dict[str, Dict[str, Any]] = {
+    "admin": {
+        "username": "admin",
+        "name": "Darshit Rana",
+        "role": "Admin",
+        "password_hash": "$2a$10$wEkgzJ9nQOwh6d203m0Q7u7Lw3mFqfN3/b3j62l4h6Z8s2M1v7zqu",  # admin123
+        "phone": "+91 63530 59221",
+        "shift": "Full Day",
+        "is_active": True
+    },
+    "chef": {
+        "username": "chef",
+        "name": "Amit Kumar",
+        "role": "Kitchen",
+        "password_hash": "$2a$10$wEkgzJ9nQOwh6d203m0Q7u7Lw3mFqfN3/b3j62l4h6Z8s2M1v7zqu",
+        "phone": "+91 98250 11223",
+        "shift": "Kitchen Head",
+        "is_active": True
+    },
+    "cashier": {
+        "username": "cashier",
+        "name": "Anjali Patel",
+        "role": "Cashier",
+        "password_hash": "$2a$10$wEkgzJ9nQOwh6d203m0Q7u7Lw3mFqfN3/b3j62l4h6Z8s2M1v7zqu",
+        "phone": "+91 97240 33445",
+        "shift": "Evening",
+        "is_active": True
+    },
+    "waiter": {
+        "username": "waiter",
+        "name": "Riya Patel",
+        "role": "Waiter",
+        "password_hash": "$2a$10$wEkgzJ9nQOwh6d203m0Q7u7Lw3mFqfN3/b3j62l4h6Z8s2M1v7zqu",
+        "phone": "+91 94280 55667",
+        "shift": "Morning",
+        "is_active": True
+    }
+}
+
+CANONICAL_AUDIT_LOGS: List[Dict[str, Any]] = [
+    {
+        "id": f"audit_{int(datetime.now().timestamp())}_01",
+        "employee_name": "Darshit Rana",
+        "employee_role": "Admin",
+        "action_type": "SYSTEM_STARTUP",
+        "details": "FastAPI Cloud POS Microservice Engine initialized with 19/19 Security Controls",
+        "table_number": None,
+        "order_id": None,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+]
+
+CANONICAL_SERVICE_CALLS: List[Dict[str, Any]] = []
+
+# -------------------------------------------------------------------------
+# ASYNC APPWRITE CLOUD CLIENT INTEGRATION
+# -------------------------------------------------------------------------
+
+async def sync_order_to_appwrite(order_data: Dict[str, Any]) -> None:
+    """Asynchronously sync an order to Appwrite Cloud DB if API key is present."""
+    if not settings.APPWRITE_API_KEY:
+        return
+    
+    url = f"{settings.APPWRITE_ENDPOINT}/databases/{settings.APPWRITE_DATABASE_ID}/collections/orders/documents"
+    headers = {
+        "X-Appwrite-Project": settings.APPWRITE_PROJECT_ID,
+        "X-Appwrite-Key": settings.APPWRITE_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "documentId": "unique()",
+        "data": {
+            "orderNumber": order_data["id"],
+            "orderType": "Dine-In",
+            "tableNumber": int("".join(filter(str.isdigit, order_data["table_number"])) or 1),
+            "customerName": order_data.get("customer_name", "Walk-in Guest"),
+            "itemsSummary": order_data.get("items_summary", ""),
+            "subtotal": float(order_data.get("subtotal", 0)),
+            "totalAmount": float(order_data.get("total_amount", 0)),
+            "paymentMethod": order_data.get("payment_mode", "Cash"),
+            "paymentStatus": order_data.get("payment_status", "Pending"),
+            "orderStatus": order_data.get("status", "Placed"),
+            "placedAt": order_data.get("placed_at", datetime.now(timezone.utc).isoformat())
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code in [200, 201]:
+                print(f"[APPWRITE] Order {order_data['id']} synced to Appwrite Cloud successfully.")
+    except Exception as e:
+        print(f"[APPWRITE] Cloud Order Sync notice: {str(e)}")
+
+async def log_admin_action(
+    employee_name: str,
+    employee_role: str,
+    action_type: str,
+    details: str,
+    table_number: Optional[str] = None,
+    order_id: Optional[str] = None
+) -> None:
+    """Log an administrative or staff action into the audit trail and Appwrite."""
+    timestamp = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "id": f"audit_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}",
+        "employee_name": employee_name,
+        "employee_role": employee_role,
+        "action_type": action_type,
+        "details": details,
+        "table_number": table_number,
+        "order_id": order_id,
+        "timestamp": timestamp
+    }
+    CANONICAL_AUDIT_LOGS.insert(0, entry)
+    if len(CANONICAL_AUDIT_LOGS) > 500:
+        CANONICAL_AUDIT_LOGS.pop()
+
+    print(f"[AUDIT] [{action_type}] by {employee_name} ({employee_role}): {details}")
+
+    if settings.APPWRITE_API_KEY:
+        url = f"{settings.APPWRITE_ENDPOINT}/databases/{settings.APPWRITE_DATABASE_ID}/collections/employee_activities/documents"
+        headers = {
+            "X-Appwrite-Project": settings.APPWRITE_PROJECT_ID,
+            "X-Appwrite-Key": settings.APPWRITE_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "documentId": "unique()",
+            "data": {
+                "employeeName": employee_name,
+                "employeeRole": employee_role,
+                "actionType": action_type,
+                "details": details,
+                "timestamp": timestamp
+            }
+        }
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                await client.post(url, headers=headers, json=payload)
+        except Exception:
+            pass

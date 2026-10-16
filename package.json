@@ -11,8 +11,10 @@
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "preview": "npm --prefix frontend run preview",
-    "backend": "npm --prefix backend start",
-    "backend:dev": "npm --prefix backend run dev",
+    "backend": "python backend/run.py",
+    "backend:py": "backend\\.venv\\Scripts\\python.exe backend/run.py",
+    "backend:test": "backend\\.venv\\Scripts\\pytest.exe backend/tests -v",
+    "backend:node": "npm --prefix backend start",
     "seed": "npm --prefix backend run seed",
     "test:connection": "npm --prefix backend run test-connection"
   },
