@@ -104,7 +104,39 @@ export default function ExecutiveDashboard({
 
   const currentDataset = chartDatasets[timeframe];
   const maxRevenue = Math.max(...currentDataset.points.map(p => p.revenue));
-  const activePoint = currentDataset.points[selectedPointIndex] || currentDataset.points[0];
+  const activePointIndex = Math.min(selectedPointIndex, currentDataset.points.length - 1);
+  const activePoint = currentDataset.points[activePointIndex] || currentDataset.points[0];
+
+  // SVG Spline Wave Calculations for Ambient Background Line & Glow Area
+  const numPoints = currentDataset.points.length;
+  const svgCoords = currentDataset.points.map((pt, i) => {
+    const x = numPoints > 1 ? (i / (numPoints - 1)) * 900 + 50 : 500;
+    const y = 160 - ((pt.revenue / maxRevenue) * 115);
+    return { x, y, pt };
+  });
+
+  const generateSvgPath = (coords) => {
+    if (coords.length === 0) return '';
+    if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
+    let d = `M ${coords[0].x} ${coords[0].y}`;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const p0 = coords[i === 0 ? 0 : i - 1];
+      const p1 = coords[i];
+      const p2 = coords[i + 1];
+      const p3 = coords[i + 2] || p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
+
+  const splinePath = generateSvgPath(svgCoords);
+  const areaPath = svgCoords.length > 0 
+    ? `${splinePath} L ${svgCoords[svgCoords.length - 1].x} 190 L ${svgCoords[0].x} 190 Z` 
+    : '';
 
   // Fetch live orders and sessions from Supabase
   const fetchLiveSupabaseData = async () => {
@@ -460,12 +492,58 @@ export default function ExecutiveDashboard({
         </div>
 
         {/* Clickable Modern Interactive SVG Bar & Wave Chart */}
-        <div className="pt-4">
-          <div className="grid grid-cols-7 sm:grid-cols-7 gap-2 sm:gap-4 items-end h-48 sm:h-56 pb-2 border-b border-zinc-100">
+        <div className="pt-2 relative">
+          
+          {/* Background Grid Lines & Y-Axis Scale */}
+          <div className="absolute inset-x-0 top-12 bottom-16 flex flex-col justify-between pointer-events-none opacity-40">
+            <div className="border-b border-dashed border-zinc-200 w-full flex justify-end pr-2 text-[10px] text-zinc-400 font-mono">
+              ₹{maxRevenue.toLocaleString('en-IN')}
+            </div>
+            <div className="border-b border-dashed border-zinc-200 w-full flex justify-end pr-2 text-[10px] text-zinc-400 font-mono">
+              ₹{Math.round(maxRevenue * 0.66).toLocaleString('en-IN')}
+            </div>
+            <div className="border-b border-dashed border-zinc-200 w-full flex justify-end pr-2 text-[10px] text-zinc-400 font-mono">
+              ₹{Math.round(maxRevenue * 0.33).toLocaleString('en-IN')}
+            </div>
+            <div className="border-b border-zinc-200 w-full flex justify-end pr-2 text-[10px] text-zinc-400 font-mono">
+              ₹0
+            </div>
+          </div>
+
+          {/* Background Ambient SVG Spline Wave */}
+          <div className="absolute inset-x-0 top-6 bottom-16 pointer-events-none overflow-hidden">
+            <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="w-full h-full">
+              <defs>
+                <linearGradient id="salesVelocityGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f97316" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="#f97316" stopOpacity="0.01" />
+                </linearGradient>
+              </defs>
+              <path d={areaPath} fill="url(#salesVelocityGrad)" />
+              <path d={splinePath} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+              {svgCoords.map((c, i) => (
+                <circle 
+                  key={i} 
+                  cx={c.x} 
+                  cy={c.y} 
+                  r={activePointIndex === i ? 6 : 4} 
+                  fill={activePointIndex === i ? '#ea580c' : '#f97316'} 
+                  stroke="#ffffff" 
+                  strokeWidth="2" 
+                />
+              ))}
+            </svg>
+          </div>
+
+          {/* Interactive Bars Grid (Dynamic column count) */}
+          <div 
+            className="relative z-10 grid gap-2 sm:gap-4 items-end h-64 sm:h-72 pb-2"
+            style={{ gridTemplateColumns: `repeat(${currentDataset.points.length}, minmax(0, 1fr))` }}
+          >
             {currentDataset.points.map((pt, index) => {
-              const isSelected = selectedPointIndex === index;
+              const isSelected = activePointIndex === index;
               const isHovered = hoveredPoint === index;
-              const heightPercent = Math.max(18, Math.round((pt.revenue / maxRevenue) * 100));
+              const heightPercent = Math.max(16, Math.round((pt.revenue / maxRevenue) * 100));
 
               return (
                 <div 
@@ -475,38 +553,51 @@ export default function ExecutiveDashboard({
                   onMouseLeave={() => setHoveredPoint(null)}
                   className="flex flex-col items-center justify-end h-full group cursor-pointer relative"
                 >
-                  {/* Floating tooltip on hover */}
-                  {(isHovered || isSelected) && (
-                    <div className="absolute -top-10 z-10 px-2.5 py-1 rounded-xl bg-zinc-900 text-white text-[11px] font-bold shadow-lg whitespace-nowrap animate-in fade-in zoom-in-95 pointer-events-none">
-                      ₹{pt.revenue.toLocaleString('en-IN')}
-                    </div>
-                  )}
+                  {/* Top Value Tag */}
+                  <div className={`mb-2 px-2.5 py-1 rounded-xl text-[11px] font-mono font-black transition-all whitespace-nowrap shadow-xs ${
+                    isSelected 
+                      ? 'bg-zinc-900 text-white scale-105 shadow-md ring-2 ring-orange-500/30' 
+                      : isHovered 
+                      ? 'bg-orange-600 text-white shadow-sm' 
+                      : 'bg-white/95 text-zinc-700 border border-zinc-200 group-hover:border-orange-300'
+                  }`}>
+                    ₹{pt.revenue >= 100000 ? `${(pt.revenue / 100000).toFixed(2)}L` : (pt.revenue >= 1000 ? `${(pt.revenue / 1000).toFixed(1)}k` : pt.revenue)}
+                  </div>
 
-                  {/* Visual Bar Column */}
-                  <div className="w-full max-w-[48px] flex flex-col items-center">
+                  {/* Explicit-Height Bar Pillar Track Container */}
+                  <div className="w-full max-w-[56px] h-36 sm:h-44 flex flex-col justify-end items-center rounded-2xl bg-zinc-100/70 p-1.5 border border-zinc-200/60 group-hover:border-orange-300 group-hover:bg-orange-50/40 transition-all">
                     <div 
-                      style={{ height: `${heightPercent}%` }}
-                      className={`w-full rounded-2xl transition-all duration-300 relative overflow-hidden ${
+                      style={{ height: `${heightPercent}%`, minHeight: '22px' }}
+                      className={`w-full rounded-xl transition-all duration-300 relative overflow-hidden flex flex-col justify-between items-center py-1 ${
                         isSelected 
-                          ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-md shadow-orange-500/30' 
-                          : 'bg-zinc-100 group-hover:bg-orange-100/90'
+                          ? 'bg-gradient-to-t from-orange-600 via-orange-500 to-amber-400 shadow-md shadow-orange-500/40 ring-2 ring-orange-500/30' 
+                          : 'bg-gradient-to-t from-zinc-300 via-zinc-200 to-zinc-200 group-hover:from-orange-400 group-hover:to-amber-300'
                       }`}
                     >
-                      {/* Subtle glossy sheen */}
-                      <div className="absolute inset-0 bg-white/15 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      {/* Glow indicator dot at apex */}
+                      <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white shadow-sm ring-2 ring-orange-300' : 'bg-white/60'}`} />
+                      
+                      {/* Glossy sheen on hover */}
+                      <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     </div>
                   </div>
 
-                  {/* Label */}
-                  <span className={`text-[11px] font-bold mt-2 transition-colors ${
-                    isSelected ? 'text-orange-600 font-black' : 'text-zinc-500 group-hover:text-zinc-900'
-                  }`}>
-                    {pt.label}
-                  </span>
+                  {/* Bottom Column Labels */}
+                  <div className="text-center mt-2.5">
+                    <span className={`block text-xs font-bold transition-colors ${
+                      isSelected ? 'text-orange-600 font-black' : 'text-zinc-600 group-hover:text-zinc-900'
+                    }`}>
+                      {pt.label}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-medium font-mono">
+                      {pt.orders} orders
+                    </span>
+                  </div>
                 </div>
               );
             })}
           </div>
+
         </div>
 
       </div>
