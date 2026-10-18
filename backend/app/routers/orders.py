@@ -17,7 +17,7 @@ from app.database import (
     CANONICAL_COUPONS,
     CANONICAL_ORDERS,
     CANONICAL_TABLES,
-    sync_order_to_appwrite,
+    sync_order_to_supabase,
     log_admin_action
 )
 from app.security import get_current_user
@@ -30,7 +30,7 @@ async def place_guest_order(request: Request, body: GuestOrderCreate):
     Never Trust The Frontend:
     Authoritative server-side price recalculation, anti-bot honeypot check,
     coupon discount validation, and 5% GST computation.
-    Directly dispatches order to Kitchen KDS and syncs to Appwrite Cloud DB.
+    Directly dispatches order to Kitchen KDS and syncs to Supabase Cloud DB.
     """
     # 1. Anti-Bot Honeypot checks
     if body.gotcha or body.anti_bot_token:
@@ -129,8 +129,8 @@ async def place_guest_order(request: Request, body: GuestOrderCreate):
         CANONICAL_TABLES[clean_table]["current_order_id"] = order_id
         CANONICAL_TABLES[clean_table]["timing"] = "Just now"
 
-    # Background async sync to Appwrite
-    await sync_order_to_appwrite(new_order_dict)
+    # Background async sync to Supabase
+    await sync_order_to_supabase(new_order_dict)
 
     return OrderResponse(**new_order_dict)
 

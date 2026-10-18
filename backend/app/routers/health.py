@@ -8,7 +8,7 @@ router = APIRouter(prefix="/health", tags=["System Health & Security"])
 async def get_health_status():
     """
     Returns live service health status, security posture audit checklist,
-    and Appwrite Cloud database connectivity telemetry.
+    and Supabase PostgreSQL cloud database connectivity telemetry.
     """
     return {
         "status": "online",
@@ -33,9 +33,8 @@ async def get_health_status():
             "webhook_hmac_verified": True
         },
         "live_database": {
-            "provider": "Appwrite Cloud + Authoritative In-Memory Engine",
-            "project_id": settings.APPWRITE_PROJECT_ID,
-            "database_id": settings.APPWRITE_DATABASE_ID,
+            "provider": "Supabase PostgreSQL Cloud + Authoritative Engine",
+            "project_url": settings.SUPABASE_URL,
             "status": "connected"
         },
         "timestamp": datetime.now(timezone.utc).isoformat()

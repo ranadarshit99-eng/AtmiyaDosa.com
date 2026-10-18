@@ -440,44 +440,43 @@ CANONICAL_AUDIT_LOGS: List[Dict[str, Any]] = [
 CANONICAL_SERVICE_CALLS: List[Dict[str, Any]] = []
 
 # -------------------------------------------------------------------------
-# ASYNC APPWRITE CLOUD CLIENT INTEGRATION
+# ASYNC SUPABASE CLOUD CLIENT INTEGRATION
 # -------------------------------------------------------------------------
 
-async def sync_order_to_appwrite(order_data: Dict[str, Any]) -> None:
-    """Asynchronously sync an order to Appwrite Cloud DB if API key is present."""
-    if not settings.APPWRITE_API_KEY:
+async def sync_order_to_supabase(order_data: Dict[str, Any]) -> None:
+    """Asynchronously sync an order to Supabase Cloud DB if service key is present."""
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
         return
     
-    url = f"{settings.APPWRITE_ENDPOINT}/databases/{settings.APPWRITE_DATABASE_ID}/collections/orders/documents"
+    url = f"{settings.SUPABASE_URL}/rest/v1/orders"
     headers = {
-        "X-Appwrite-Project": settings.APPWRITE_PROJECT_ID,
-        "X-Appwrite-Key": settings.APPWRITE_API_KEY,
-        "Content-Type": "application/json"
+        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
     }
     payload = {
-        "documentId": "unique()",
-        "data": {
-            "orderNumber": order_data["id"],
-            "orderType": "Dine-In",
-            "tableNumber": int("".join(filter(str.isdigit, order_data["table_number"])) or 1),
-            "customerName": order_data.get("customer_name", "Walk-in Guest"),
-            "itemsSummary": order_data.get("items_summary", ""),
-            "subtotal": float(order_data.get("subtotal", 0)),
-            "totalAmount": float(order_data.get("total_amount", 0)),
-            "paymentMethod": order_data.get("payment_mode", "Cash"),
-            "paymentStatus": order_data.get("payment_status", "Pending"),
-            "orderStatus": order_data.get("status", "Placed"),
-            "placedAt": order_data.get("placed_at", datetime.now(timezone.utc).isoformat())
-        }
+        "id": order_data["id"],
+        "table_number": order_data["table_number"],
+        "customer_name": order_data.get("customer_name", "Walk-in Guest"),
+        "subtotal": float(order_data.get("subtotal", 0)),
+        "total_amount": float(order_data.get("total_amount", 0)),
+        "payment_method": order_data.get("payment_mode", "Cash"),
+        "payment_status": order_data.get("payment_status", "Pending"),
+        "status": order_data.get("status", "Placed"),
+        "placed_at": order_data.get("placed_at", datetime.now(timezone.utc).isoformat())
     }
 
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
             if resp.status_code in [200, 201]:
-                print(f"[APPWRITE] Order {order_data['id']} synced to Appwrite Cloud successfully.")
+                print(f"[SUPABASE] Order {order_data['id']} synced to Supabase Cloud successfully.")
     except Exception as e:
-        print(f"[APPWRITE] Cloud Order Sync notice: {str(e)}")
+        print(f"[SUPABASE] Cloud Order Sync notice: {str(e)}")
+
+# Backward-compatible alias
+sync_order_to_appwrite = sync_order_to_supabase
 
 async def log_admin_action(
     employee_name: str,
@@ -487,7 +486,7 @@ async def log_admin_action(
     table_number: Optional[str] = None,
     order_id: Optional[str] = None
 ) -> None:
-    """Log an administrative or staff action into the audit trail and Appwrite."""
+    """Log an administrative or staff action into the audit trail and Supabase."""
     timestamp = datetime.now(timezone.utc).isoformat()
     entry = {
         "id": f"audit_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}",
@@ -505,22 +504,22 @@ async def log_admin_action(
 
     print(f"[AUDIT] [{action_type}] by {employee_name} ({employee_role}): {details}")
 
-    if settings.APPWRITE_API_KEY:
-        url = f"{settings.APPWRITE_ENDPOINT}/databases/{settings.APPWRITE_DATABASE_ID}/collections/employee_activities/documents"
+    if settings.SUPABASE_SERVICE_ROLE_KEY:
+        url = f"{settings.SUPABASE_URL}/rest/v1/audit_logs"
         headers = {
-            "X-Appwrite-Project": settings.APPWRITE_PROJECT_ID,
-            "X-Appwrite-Key": settings.APPWRITE_API_KEY,
-            "Content-Type": "application/json"
+            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
         }
         payload = {
-            "documentId": "unique()",
-            "data": {
-                "employeeName": employee_name,
-                "employeeRole": employee_role,
-                "actionType": action_type,
-                "details": details,
-                "timestamp": timestamp
-            }
+            "employee_name": employee_name,
+            "employee_role": employee_role,
+            "action_type": action_type,
+            "details": details,
+            "table_number": table_number,
+            "order_id": order_id,
+            "created_at": timestamp
         }
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:

@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     print(">> Atmiya Dosa Hub POS Engine (FastAPI 2.0.0)")
     print(f">> Server running on http://{settings.HOST}:{settings.PORT}")
     print(">> Security Checklist Applied: 19/19 Controls Active")
-    print(f">> Live Appwrite Cloud DB: {settings.APPWRITE_DATABASE_ID}")
+    print(f">> Live Supabase Cloud DB: {settings.SUPABASE_URL}")
     print(f">> Environment: {settings.ENVIRONMENT}")
     print(f">> Swagger UI Documentation: http://localhost:{settings.PORT}/docs")
     print("======================================================\n")
@@ -51,7 +51,7 @@ app = FastAPI(
     title="Atmiya Dosa Hub - POS & Cloud Order Engine",
     description=(
         "Enterprise restaurant management microservice featuring touchless QR code table ordering, "
-        "Kitchen Display System (KDS), authoritative server-side billing, live Appwrite cloud sync, "
+        "Kitchen Display System (KDS), authoritative server-side billing, live Supabase PostgreSQL sync, "
         "raw material inventory, and role-based staff authentication."
     ),
     version="2.0.0",
