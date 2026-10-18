@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Utensils, 
@@ -24,7 +24,13 @@ import {
   Copy,
   ExternalLink,
   Wifi,
-  Share2
+  Share2,
+  ShieldCheck,
+  AlertTriangle,
+  CreditCard,
+  Banknote,
+  Zap,
+  CheckCheck
 } from 'lucide-react';
 import { getTranslation } from '../../lib/translations';
 import { playSound } from '../../lib/sound';
@@ -52,8 +58,40 @@ export default function TablesView({
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [shiftTargetTable, setShiftTargetTable] = useState('');
   const [copiedUrl, setCopiedUrl] = useState(null);
+  const [autoVacatePaidTables, setAutoVacatePaidTables] = useState(false);
   
   const [newTable, setNewTable] = useState({ number: '', capacity: 4, zone: 'Main Hall' });
+
+  // 30-Minute Automatic Table Vacate Engine for Online Paid Orders
+  useEffect(() => {
+    if (!autoVacatePaidTables) return;
+    const interval = setInterval(() => {
+      tables.forEach(table => {
+        if (table.status === 'occupied') {
+          const order = getTableActiveOrder(table.number);
+          if (order && (order.status === 'Served' || order.status === 'Ready')) {
+            const isOrderPaid = Boolean(
+              order.payment_status?.toLowerCase() === 'paid' || 
+              order.payment_mode === 'Razorpay' || 
+              order.payment_mode === 'Online' || 
+              order.payment_mode === 'ONLINE_RAZORPAY' ||
+              order.payment_mode === 'UPI' ||
+              order.payment_verified_online === true
+            );
+            const m = (table.timing || '').match(/\d+/);
+            const mins = m ? parseInt(m[0], 10) : 0;
+            // If table dining time reached 30 minutes and bill is already paid online
+            if (isOrderPaid && mins >= 30) {
+              if (onSettleTableBill) {
+                onSettleTableBill(order.id, table.number, order.payment_mode || 'UPI');
+              }
+            }
+          }
+        }
+      });
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoVacatePaidTables, tables, orders]);
 
   const t = (key) => getTranslation(currentLang, key);
   const zones = ['All', 'Main Hall', 'AC Section', 'Patio Garden', 'Family Section'];
@@ -280,29 +318,49 @@ export default function TablesView({
         </div>
       </div>
 
-      {/* 3. ZONE TABS */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-        {zones.map(z => {
-          const count = z === 'All' ? tables.length : tables.filter(t => t.zone === z).length;
-          return (
-            <button
-              key={z}
-              onClick={() => setSelectedZone(z)}
-              className={`px-4 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap flex items-center space-x-2 ${
-                selectedZone === z 
-                  ? 'bg-slate-900 text-white shadow-sm' 
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <span>{z}</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                selectedZone === z ? 'bg-slate-800 text-orange-400' : 'bg-slate-100 text-slate-500'
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      {/* 3. ZONE TABS & TURNOVER CONTROLS */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+          {zones.map(z => {
+            const count = z === 'All' ? tables.length : tables.filter(t => t.zone === z).length;
+            return (
+              <button
+                key={z}
+                onClick={() => setSelectedZone(z)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap flex items-center space-x-2 ${
+                  selectedZone === z 
+                    ? 'bg-slate-900 text-white shadow-sm' 
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>{z}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  selectedZone === z ? 'bg-slate-800 text-orange-400' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 30m Turnover Engine Auto-Vacate Switch */}
+        <button
+          onClick={() => {
+            const nextState = !autoVacatePaidTables;
+            setAutoVacatePaidTables(nextState);
+            playSound(nextState ? 'success' : 'click');
+          }}
+          className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center space-x-2 shrink-0 border ${
+            autoVacatePaidTables 
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm ring-1 ring-emerald-200' 
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+          }`}
+          title="Turn on 30-minute automatic table vacation for online prepaid orders"
+        >
+          <Zap className={`w-3.5 h-3.5 ${autoVacatePaidTables ? 'text-emerald-600 fill-emerald-600 animate-pulse' : 'text-slate-400'}`} />
+          <span>30m Turnover Engine: <strong className={autoVacatePaidTables ? 'text-emerald-700' : 'text-slate-500'}>{autoVacatePaidTables ? '⚡ AUTO-VACATE (30m)' : 'MANUAL'}</strong></span>
+        </button>
       </div>
 
       {/* 4. MAIN TABLE RENDERING */}
@@ -333,13 +391,30 @@ export default function TablesView({
                     )}
                   </div>
 
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                    isOccupied 
-                      ? 'bg-orange-100 text-orange-800 border border-orange-300' 
-                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  }`}>
-                    {isOccupied ? 'Dining' : 'Vacant'}
-                  </span>
+                  {isOccupied ? (
+                    (() => {
+                      const isOrderPaid = activeOrder && (
+                        activeOrder.payment_status === 'Paid' || 
+                        activeOrder.payment_status === 'PAID' || 
+                        activeOrder.payment_mode === 'Razorpay' || 
+                        activeOrder.payment_mode === 'Online' || 
+                        activeOrder.payment_mode === 'ONLINE_RAZORPAY'
+                      );
+                      return (
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          isOrderPaid 
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                            : 'bg-amber-100 text-amber-900 border border-amber-300'
+                        }`}>
+                          {isOrderPaid ? '✅ Paid Online' : '⚠️ Cash Due'}
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Vacant
+                    </span>
+                  )}
                 </div>
 
                 {/* Table Metadata */}
@@ -523,76 +598,342 @@ export default function TablesView({
               const orderItems = activeOrder.items || [];
               const totalAmt = activeOrder.total || activeOrder.total_amount || 0;
 
+              // Authoritative Payment Status Classification
+              const isPaidOnline = Boolean(
+                (activeOrder.payment_status?.toLowerCase() === 'paid' && 
+                 (activeOrder.payment_mode?.toLowerCase().includes('upi') || 
+                  activeOrder.payment_mode?.toLowerCase().includes('razorpay') || 
+                  activeOrder.payment_mode?.toLowerCase().includes('online') || 
+                  activeOrder.payment_verified_online === true)) ||
+                activeOrder.payment_mode === 'ONLINE_RAZORPAY' ||
+                activeOrder.payment_mode === 'Razorpay' ||
+                activeOrder.payment_mode === 'Online (Prepaid)'
+              );
+
+              const isCashPaid = Boolean(
+                !isPaidOnline && 
+                activeOrder.payment_status?.toLowerCase() === 'paid' && 
+                (activeOrder.payment_mode?.toLowerCase().includes('cash') || activeOrder.payment_mode?.toLowerCase().includes('counter'))
+              );
+
+              const isCashUnpaid = Boolean(!isPaidOnline && !isCashPaid);
+
+              // 30-Minute Turnover Calculation
+              const elapsedMins = (() => {
+                if (selectedTable?.timing) {
+                  const m = selectedTable.timing.match(/\d+/);
+                  if (m) return parseInt(m[0], 10);
+                }
+                if (activeOrder.time) {
+                  const m = activeOrder.time.match(/\d+/);
+                  if (m) return parseInt(m[0], 10);
+                }
+                return 18;
+              })();
+
+              const targetDiningMins = 30;
+              const diningProgressPercent = Math.min(Math.round((elapsedMins / targetDiningMins) * 100), 100);
+              const isOvertime = elapsedMins >= targetDiningMins;
+              const isFinishedEarly = elapsedMins >= 15 && elapsedMins < targetDiningMins;
+
               return (
                 <div className="space-y-4">
-                  {/* Order Overview Header */}
+                  
+                  {/* 1. ORDER OVERVIEW HEADER */}
                   <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-200/90 flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-bold text-orange-900 font-mono">{activeOrder.id}</span>
-                      <div className="text-[11px] text-orange-700">{activeOrder.customer_name || 'Guest'}</div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-orange-900 font-mono text-sm">{activeOrder.id}</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-orange-200/80 text-orange-950 text-[10px] font-bold">
+                          {activeOrder.order_source || 'QR Self-Order'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-orange-700 font-medium mt-0.5">
+                        Guest: <span className="font-bold text-orange-900">{activeOrder.customer_name || 'Guest'}</span>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <span className="px-2 py-0.5 rounded-full bg-orange-200 text-orange-900 font-black text-[10px] uppercase">
-                        {activeOrder.status}
+                      <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider inline-flex items-center space-x-1 ${
+                        activeOrder.status === 'Served'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : activeOrder.status === 'Ready'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-orange-200 text-orange-900'
+                      }`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                        <span>{activeOrder.status}</span>
                       </span>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">{activeOrder.time || '12m ago'}</div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        Placed: {activeOrder.time || '12m ago'}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Itemized Bill Preview */}
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 text-xs">
-                    {orderItems.map((item, idx) => (
-                      <div key={idx} className="pt-1.5 flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold font-mono text-orange-600">{item.qty}x</span>
-                          <span className="font-bold text-slate-800">{item.name}</span>
+                  {/* 2. PROMINENT PAYMENT VERIFICATION BANNER */}
+                  {isPaidOnline ? (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 shadow-sm flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                          <ShieldCheck className="w-5 h-5" />
                         </div>
-                        <span className="font-mono font-bold text-slate-900">₹{(item.price || 0) * (item.qty || 1)}</span>
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs font-black text-emerald-950 uppercase tracking-wide">
+                              PAID ONLINE (Razorpay / UPI)
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-black text-[9px] tracking-wider">
+                              VERIFIED
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-700 font-medium">
+                            Settled directly via Gateway • <strong className="text-emerald-900">₹0.00 Balance Due</strong>
+                          </p>
+                        </div>
                       </div>
-                    ))}
+                      <div className="text-right pl-2 shrink-0">
+                        <div className="text-sm font-black text-emerald-900 font-mono">₹{totalAmt}</div>
+                        <div className="text-[9px] font-bold text-emerald-600 uppercase">Paid in Full</div>
+                      </div>
+                    </div>
+                  ) : isCashPaid ? (
+                    <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 shadow-sm flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                          <CheckCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-black text-blue-950 uppercase tracking-wide">
+                            Cash Collected at Counter
+                          </span>
+                          <p className="text-[11px] text-blue-700 font-medium">
+                            Collected by {activeOrder.paid_collected_by || 'Cashier'} • ₹0.00 Due
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right pl-2 shrink-0">
+                        <div className="text-sm font-black text-blue-900 font-mono">₹{totalAmt}</div>
+                        <div className="text-[9px] font-bold text-blue-600 uppercase">Settled</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 shadow-sm flex items-center justify-between animate-pulse">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                              ⚠️ CASH ON TABLE (UNPAID)
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900 font-black text-[9px] tracking-wider">
+                              COLLECT CASH
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-800 font-medium">
+                            Guest chose COD / Cash • Must collect before clearing table!
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right pl-2 shrink-0">
+                        <div className="text-sm font-black text-rose-600 font-mono">₹{totalAmt}</div>
+                        <div className="text-[9px] font-bold text-rose-500 uppercase">Cash Due</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. 30-MINUTE DINING TURNOVER ENGINE */}
+                  <div className={`p-3.5 rounded-2xl border transition-all ${
+                    isOvertime 
+                      ? (isPaidOnline ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-200' : 'bg-rose-50 border-rose-300 ring-2 ring-rose-200')
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <div className="flex items-center space-x-1.5">
+                        <Clock className={`w-3.5 h-3.5 ${isOvertime ? 'text-rose-600' : 'text-slate-600'}`} />
+                        <span className="font-bold text-slate-800 font-heading">
+                          Dining Turnover Tracker
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">(Avg. 30m Target)</span>
+                      </div>
+                      <div className="font-mono font-black text-xs">
+                        <span className={isOvertime ? 'text-rose-600' : 'text-slate-900'}>
+                          {elapsedMins}m
+                        </span>
+                        <span className="text-slate-400"> / 30m</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          isOvertime ? 'bg-rose-500' : isFinishedEarly ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${diningProgressPercent}%` }}
+                      />
+                    </div>
+
+                    {/* Turnover Prompts & Edge Cases */}
+                    <div className="mt-2.5">
+                      {isOvertime ? (
+                        isPaidOnline ? (
+                          <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-orange-200 text-xs">
+                            <div className="text-[11px] text-orange-950 font-medium">
+                              ⚡ <span className="font-black">30m Target Reached:</span> Bill is 100% paid online. Free table for waiting guests:
+                            </div>
+                            <button
+                              onClick={() => handleQuickSettle(selectedTable, activeOrder.payment_mode || 'UPI')}
+                              className="ml-2 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-[11px] shadow whitespace-nowrap transition"
+                            >
+                              Vacate Table Now
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-xl bg-rose-100 border border-rose-300 text-xs text-rose-950 space-y-1">
+                            <div className="flex items-center space-x-1.5 font-black text-rose-900">
+                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                              <span>🚨 CRITICAL WALKOUT GUARD: 30+ Mins Elapsed!</span>
+                            </div>
+                            <p className="text-[11px] text-rose-800">
+                              Guest selected COD / Cash on Table. Do <span className="font-bold underline">NOT</span> clear table until <span className="font-bold font-mono">₹{totalAmt}</span> cash is physically collected!
+                            </p>
+                          </div>
+                        )
+                      ) : isFinishedEarly ? (
+                        <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-200 text-xs">
+                          <span className="text-[11px] text-slate-600 font-medium">
+                            Guests finished eating in {elapsedMins} mins?
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (isPaidOnline || isCashPaid) {
+                                handleQuickSettle(selectedTable, activeOrder.payment_mode || 'UPI');
+                              } else {
+                                handleQuickSettle(selectedTable, 'Cash');
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] shadow transition"
+                          >
+                            ⚡ Vacate Early ({elapsedMins}m)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-500 flex items-center justify-between font-medium">
+                          <span>Guests dining comfortably</span>
+                          <span className="font-mono">~{Math.max(30 - elapsedMins, 0)}m typical dining left</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Total Bar */}
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-sm font-black text-slate-900 font-heading">
-                    <span>Total Outstanding:</span>
-                    <span className="text-lg text-orange-600 font-mono">₹{totalAmt}</span>
+                  {/* 4. ITEMIZED BILL PREVIEW */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Ordered Items</span>
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100 text-xs bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
+                      {orderItems.map((item, idx) => (
+                        <div key={idx} className="pt-1.5 first:pt-0 flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold font-mono text-orange-600">{item.qty}x</span>
+                            <span className="font-bold text-slate-800">{item.name}</span>
+                          </div>
+                          <span className="font-mono font-bold text-slate-900">₹{(item.price || 0) * (item.qty || 1)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Actions Row */}
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <button
-                      onClick={() => handleQuickSettle(selectedTable, 'Cash')}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow flex items-center justify-center space-x-1.5 transition"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Settle Bill (Cash)</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleQuickSettle(selectedTable, 'UPI')}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow flex items-center justify-center space-x-1.5 transition"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Settle Bill (UPI)</span>
-                    </button>
-
-                    <button
-                      onClick={() => setShowShiftModal(true)}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition"
-                    >
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
-                      <span>Shift Table</span>
-                    </button>
-
-                    <button
-                      onClick={() => window.print()}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print KOT / Bill</span>
-                    </button>
+                  {/* 5. TOTAL BAR & BALANCE DUE */}
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-slate-500 font-medium">Order Subtotal: </span>
+                      <span className="font-bold font-mono text-slate-800">₹{totalAmt}</span>
+                    </div>
+                    <div className="text-right">
+                      {isPaidOnline || isCashPaid ? (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-slate-500 font-bold uppercase text-[10px]">Balance Due:</span>
+                          <span className="text-sm font-black font-mono text-emerald-600">₹0.00 (PAID)</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-slate-900 font-bold uppercase text-[10px]">Cash To Collect:</span>
+                          <span className="text-base font-black font-mono text-rose-600">₹{totalAmt}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
+                  {/* 6. CONTEXT-AWARE ACTION BUTTONS */}
+                  {isPaidOnline || isCashPaid ? (
+                    <div className="space-y-2 pt-1">
+                      <button
+                        onClick={() => handleQuickSettle(selectedTable, activeOrder.payment_mode || 'UPI')}
+                        className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2 transition"
+                      >
+                        <Zap className="w-4 h-4 fill-white" />
+                        <span>⚡ Vacate & Clean Table (Bill Already Paid Online)</span>
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setShowShiftModal(true)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-200"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          <span>Shift Table</span>
+                        </button>
+
+                        <button
+                          onClick={() => window.print()}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-200"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Print Tax Invoice</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleQuickSettle(selectedTable, 'Cash')}
+                          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow flex items-center justify-center space-x-1.5 transition"
+                        >
+                          <Banknote className="w-4 h-4" />
+                          <span>Collect ₹{totalAmt} Cash & Vacate</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleQuickSettle(selectedTable, 'UPI')}
+                          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow flex items-center justify-center space-x-1.5 transition"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          <span>Collect via QR UPI & Vacate</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setShowShiftModal(true)}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-200"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          <span>Shift Table</span>
+                        </button>
+
+                        <button
+                          onClick={() => window.print()}
+                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-200"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Print KOT / Bill</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* QR Standee Quick Action */}
                   <div className="pt-1">
                     <button
                       onClick={() => setPreviewQRTable(selectedTable)}
