@@ -133,10 +133,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auth Handlers
   const handleLoginSuccess = (user) => {
     setAuthUser(user);
     setAuthState(user);
+    if (user?.role === 'chef') {
+      setActiveTab('kitchen');
+    } else if (user?.role === 'waiter') {
+      setActiveTab('tables');
+    } else {
+      setActiveTab('dashboard');
+    }
     playSound('success');
   };
 
@@ -882,8 +888,8 @@ export default function App() {
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1">
-            <span>Version 1.0.0</span>
-            <span>{t('poweredByAppwrite')} ❤️</span>
+            <span>Version 2.0.0</span>
+            <span className="text-emerald-400 font-bold">Supabase Cloud 🟢</span>
           </div>
 
         </div>
@@ -1252,7 +1258,7 @@ export default function App() {
           <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-400">
             <span>Built with ❤️ for Restaurants</span>
             <span>|</span>
-            <span className="text-orange-600 font-bold">Powered by Appwrite Real-Time</span>
+            <span className="text-emerald-600 font-bold">Powered by Supabase Real-Time</span>
           </div>
         </footer>
 

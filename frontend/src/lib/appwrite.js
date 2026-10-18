@@ -1,25 +1,8 @@
-import { Client, Databases, Account } from 'appwrite';
+import { supabase, RESTAURANT_ID } from './supabase';
 
-// Initialize Appwrite Cloud Client
-export const client = new Client();
-client
-  .setEndpoint('https://cloud.appwrite.io/v1')
-  .setProject('6ac08445000e533e223f');
+// Supabase Cloud Configuration
+export { supabase, RESTAURANT_ID };
 
-export const databases = new Databases(client);
-export const account = new Account(client);
-
-export const DATABASE_ID = '6ac0a4ee002d013a18f6';
-export const COLLECTIONS = {
-  TABLES: 'tables',
-  CATEGORIES: 'categories',
-  MENU_ITEMS: 'menu_items',
-  PROMOTIONS: 'promotions',
-  ORDERS: 'orders',
-  EMPLOYEES: 'employees',
-  ACTIVITY: 'employee_activities',
-  SETTINGS: 'settings'
-};
 
 // LocalStorage Persistence Layer with Real-Time Event Dispatching
 export const getLocalStore = (key, fallback) => {
