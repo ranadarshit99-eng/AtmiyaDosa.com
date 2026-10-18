@@ -672,27 +672,27 @@ export default function App() {
 
   // AUTHENTICATED ADMIN DASHBOARD (MATCHING THE REFERENCE SCREENSHOT)
   return (
-    <div className="min-h-screen bg-slate-100/70 font-sans flex text-slate-900">
+    <div className="min-h-screen bg-[#FBFBFC] font-sans flex text-zinc-900">
       
-      {/* 1. LEFT DARK SIDEBAR (SLATE-900 / #111827) */}
+      {/* 1. ELEGANT LIGHT LUXURY SIDEBAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col justify-between transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 bg-white/95 backdrop-blur-xl border-r border-zinc-200/80 text-zinc-700 flex flex-col justify-between transition-transform duration-300 ease-in-out
         ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Top Logo & Restaurant Title */}
         <div>
-          <div className="p-6 flex items-center justify-between border-b border-slate-800/80">
+          <div className="p-5 flex items-center justify-between border-b border-zinc-100">
             <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-heading font-black shadow-md">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center font-heading font-black shadow-md shadow-orange-500/20">
                 <Utensils className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-base font-black text-white font-heading tracking-tight leading-tight">
-                  {settings?.restaurantName || 'Atmiya Dosa'}
+                <h1 className="text-sm font-black text-zinc-900 font-heading tracking-tight leading-tight">
+                  {settings?.restaurantName || 'Atmiya Dosa Hub'}
                 </h1>
-                <p className="text-[10px] font-semibold text-slate-400">
-                  {t('adminPanel')}
+                <p className="text-[10px] font-bold text-zinc-400">
+                  {t('adminPanel')} • Petlad
                 </p>
               </div>
             </div>
@@ -700,7 +700,7 @@ export default function App() {
             {/* Close button on mobile */}
             <button 
               onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              className="lg:hidden p-1.5 rounded-xl bg-zinc-100 text-zinc-500 hover:text-zinc-900"
             >
               <X className="w-4 h-4" />
             </button>
@@ -714,8 +714,8 @@ export default function App() {
               onClick={() => { setActiveTab('dashboard'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'dashboard' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
@@ -727,8 +727,8 @@ export default function App() {
               onClick={() => { setActiveTab('orders'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'orders' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -745,8 +745,8 @@ export default function App() {
               onClick={() => { setActiveTab('kitchen'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'kitchen' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <ChefHat className="w-4 h-4" />
@@ -758,8 +758,8 @@ export default function App() {
               onClick={() => { setActiveTab('tables'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'tables' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <Utensils className="w-4 h-4" />
@@ -771,8 +771,8 @@ export default function App() {
               onClick={() => { setActiveTab('menu'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'menu' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <Utensils className="w-4 h-4" />
@@ -784,8 +784,8 @@ export default function App() {
               onClick={() => { setActiveTab('inventory'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'inventory' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -804,8 +804,8 @@ export default function App() {
               onClick={() => { setActiveTab('employees'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'employees' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -817,8 +817,8 @@ export default function App() {
               onClick={() => { setActiveTab('reports'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'reports' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -830,8 +830,8 @@ export default function App() {
               onClick={() => { setActiveTab('offers'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'offers' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <Tag className="w-4 h-4" />
@@ -843,8 +843,8 @@ export default function App() {
               onClick={() => { setActiveTab('qr'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'qr' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <QrCode className="w-4 h-4" />
@@ -856,8 +856,8 @@ export default function App() {
               onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
                 activeTab === 'settings' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
+                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
               }`}
             >
               <Settings className="w-4 h-4" />
