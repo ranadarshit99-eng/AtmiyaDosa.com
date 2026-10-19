@@ -41,7 +41,15 @@ import {
   Trophy,
   Coffee,
   ChefHat,
-  Eye
+  Eye,
+  Sliders,
+  Settings,
+  Check,
+  Edit2,
+  ToggleLeft,
+  ToggleRight,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import { getTranslation } from '../../lib/translations';
 import { supabase, RESTAURANT_ID, recordEmployeeActivity } from '../../lib/supabase';
@@ -53,7 +61,7 @@ export default function ExecutiveDashboard({
   menuItems = [], 
   categories = [], 
   currentLang = 'en', 
-  theme = 'obsidian',
+  theme = 'light',
   onThemeChange,
   onNavigate,
   onOpenAddOrder,
@@ -61,17 +69,92 @@ export default function ExecutiveDashboard({
   onOpenGenerateQR,
   onOpenApplyCoupon
 }) {
+  // 1. Dashboard Customization State (persisted in localStorage)
+  const [dashboardConfig, setDashboardConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('admin_dashboard_config');
+      return saved ? JSON.parse(saved) : {
+        showKpis: true,
+        showPieChart: true,
+        showSalesWave: true,
+        showItemCommandCenter: true,
+        showLiveTables: true,
+        showRushHeatmap: true,
+        chartType: 'donut', // 'donut' | 'pie'
+        viewDensity: 'standard' // 'standard' | 'compact'
+      };
+    } catch {
+      return {
+        showKpis: true,
+        showPieChart: true,
+        showSalesWave: true,
+        showItemCommandCenter: true,
+        showLiveTables: true,
+        showRushHeatmap: true,
+        chartType: 'donut',
+        viewDensity: 'standard'
+      };
+    }
+  });
+
+  const updateConfig = (key, val) => {
+    const updated = { ...dashboardConfig, [key]: val };
+    setDashboardConfig(updated);
+    try {
+      localStorage.setItem('admin_dashboard_config', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+
+  // 2. Editable Daily Target Sales Goal (persisted in localStorage)
+  const [dailyTarget, setDailyTarget] = useState(() => {
+    try {
+      const saved = localStorage.getItem('admin_daily_sales_target');
+      return saved ? Number(saved) : 40000;
+    } catch {
+      return 40000;
+    }
+  });
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetInputVal, setTargetInputVal] = useState(dailyTarget);
+
+  const handleSaveDailyTarget = () => {
+    const num = Number(targetInputVal);
+    if (!isNaN(num) && num > 0) {
+      setDailyTarget(num);
+      try {
+        localStorage.setItem('admin_daily_sales_target', num.toString());
+      } catch (e) {
+        console.warn(e);
+      }
+      setIsEditingTarget(false);
+    }
+  };
+
+  // 3. Analytics Controls
   const [timeframe, setTimeframe] = useState('hourly'); // 'hourly' | 'weekly' | 'monthly'
-  const [selectedPointIndex, setSelectedPointIndex] = useState(5); // Default selected active peak hour
-  const [activeTab, setActiveTab] = useState('demand'); // 'demand' | 'pie_chart' | 'sessions' | 'crm' | 'rush_hours'
+  const [dateFilter, setDateFilter] = useState('today'); // 'today' | 'yesterday' | '7days' | 'month'
+  const [selectedPointIndex, setSelectedPointIndex] = useState(5);
   const [chartMetric, setChartMetric] = useState('revenue'); // 'revenue' | 'volume'
   const [pieMetric, setPieMetric] = useState('volume'); // 'volume' | 'revenue'
+  const [pieChartStyle, setPieChartStyle] = useState(dashboardConfig.chartType || 'donut'); // 'donut' | 'pie'
+
+  // 4. All-In-One Item Command Center State
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [demandTab, setDemandTab] = useState('bestsellers'); // 'bestsellers' | 'low_demand' | 'all'
+  const [demandTab, setDemandTab] = useState('all'); // 'all' | 'bestsellers' | 'low_demand'
   const [dishSearch, setDishSearch] = useState('');
-  const [dishSortBy, setDishSortBy] = useState('volume'); // 'volume' | 'revenue' | 'margin'
+  const [dishSortBy, setDishSortBy] = useState('volume'); // 'volume' | 'revenue' | 'margin' | 'price'
   const [hoveredSlice, setHoveredSlice] = useState(null);
-  const [selectedSlice, setSelectedSlice] = useState('cat_mysore');
+  const [selectedSlice, setSelectedSlice] = useState('all');
+
+  // Inline Price Editing State
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingPriceVal, setEditingPriceVal] = useState('');
+
+  // Modals & Real-time Sessions
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState(null);
   const [crmSearch, setCrmSearch] = useState('');
   const [liveSessions, setLiveSessions] = useState([]);
@@ -79,7 +162,7 @@ export default function ExecutiveDashboard({
 
   const isDark = theme !== 'light';
 
-  // Dynamic Theme Palette mapping
+  // Ultra-Professional Theme Palette
   const palette = useMemo(() => {
     if (theme === 'sapphire') {
       return {
@@ -91,40 +174,40 @@ export default function ExecutiveDashboard({
         textPrimary: 'text-slate-100',
         textSecondary: 'text-slate-400',
         accentGrad: 'from-indigo-600 to-blue-600',
-        activePill: 'bg-indigo-600 text-white shadow-indigo-600/30'
+        activePill: 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
       };
     }
-    if (theme === 'light') {
+    if (theme === 'obsidian') {
       return {
-        bg: 'bg-[#F8FAFC]',
-        cardBg: 'bg-white',
-        cardBorder: 'border-slate-200/90',
-        cardHover: 'hover:border-slate-300',
-        innerBox: 'bg-slate-50 border-slate-200/80',
-        textPrimary: 'text-zinc-900',
-        textSecondary: 'text-zinc-500',
-        accentGrad: 'from-orange-500 to-amber-500',
-        activePill: 'bg-zinc-900 text-white shadow-zinc-900/20'
+        bg: 'bg-[#090D16]',
+        cardBg: 'bg-[#111827]',
+        cardBorder: 'border-slate-800/80',
+        cardHover: 'hover:border-slate-700',
+        innerBox: 'bg-[#0D1322] border-slate-800/90',
+        textPrimary: 'text-slate-100',
+        textSecondary: 'text-slate-400',
+        accentGrad: 'from-orange-500 via-amber-500 to-amber-400',
+        activePill: 'bg-orange-500 text-white shadow-md shadow-orange-500/30'
       };
     }
-    // Default: 'obsidian' (Cyber Luxe)
+    // Default: 'light' — Clean, High-End Enterprise Professional White (Stripe/Toast/Linear)
     return {
-      bg: 'bg-[#090D16]',
-      cardBg: 'bg-[#111827]',
-      cardBorder: 'border-slate-800/80',
-      cardHover: 'hover:border-slate-700',
-      innerBox: 'bg-[#0D1322] border-slate-800/90',
-      textPrimary: 'text-slate-100',
-      textSecondary: 'text-slate-400',
-      accentGrad: 'from-orange-500 via-amber-500 to-amber-400',
-      activePill: 'bg-orange-500 text-white shadow-orange-500/30'
+      bg: 'bg-[#F8FAFC]',
+      cardBg: 'bg-white',
+      cardBorder: 'border-slate-200/90',
+      cardHover: 'hover:border-slate-300 hover:shadow-md',
+      innerBox: 'bg-slate-50/80 border-slate-200/80',
+      textPrimary: 'text-slate-900',
+      textSecondary: 'text-slate-500',
+      accentGrad: 'from-orange-500 to-amber-500',
+      activePill: 'bg-orange-500 text-white shadow-sm shadow-orange-500/25'
     };
   }, [theme]);
 
-  // Executive Timeframe Telemetry Dataset
+  // Executive Timeframe Datasets
   const chartDatasets = {
     hourly: {
-      title: "Today's Hourly Sales & Volume Velocity",
+      title: "Today's Sales & Volume Velocity",
       subtitle: 'Peak dinner rush recorded between 08:00 PM - 09:30 PM (21 Orders / 48 Plates)',
       total: '₹18,450',
       totalOrders: 74,
@@ -209,7 +292,7 @@ export default function ExecutiveDashboard({
     ? `${splinePath} L ${svgCoords[svgCoords.length - 1].x} 190 L ${svgCoords[0].x} 190 Z` 
     : '';
 
-  // 1. CATEGORY PIE / DONUT BREAKDOWN DATASET
+  // 5. CATEGORY PIE / DONUT BREAKDOWN DATASET
   const categoryStats = useMemo(() => [
     { 
       id: 'cat_mysore', 
@@ -219,8 +302,6 @@ export default function ExecutiveDashboard({
       volume: 486, 
       revenue: 63180, 
       color: '#F59E0B', 
-      glow: 'shadow-amber-500/30',
-      icon: 'Flame', 
       avgPlatePrice: '₹130',
       topDish: 'Mysore Masala Dosa' 
     },
@@ -231,9 +312,7 @@ export default function ExecutiveDashboard({
       percentage: 28, 
       volume: 358, 
       revenue: 89500, 
-      color: '#8B5CF6', 
-      glow: 'shadow-purple-500/30',
-      icon: 'Sparkles', 
+      color: '#6366F1', 
       avgPlatePrice: '₹250',
       topDish: 'Bahubali Dosa' 
     },
@@ -245,8 +324,6 @@ export default function ExecutiveDashboard({
       volume: 205, 
       revenue: 18450, 
       color: '#EC4899', 
-      glow: 'shadow-pink-500/30',
-      icon: 'Utensils', 
       avgPlatePrice: '₹90',
       topDish: 'Amul Butter Pav Bhaji' 
     },
@@ -258,8 +335,6 @@ export default function ExecutiveDashboard({
       volume: 128, 
       revenue: 10240, 
       color: '#10B981', 
-      glow: 'shadow-emerald-500/30',
-      icon: 'Award', 
       avgPlatePrice: '₹80',
       topDish: 'Cheese Paper Dosa' 
     },
@@ -271,8 +346,6 @@ export default function ExecutiveDashboard({
       volume: 102, 
       revenue: 12240, 
       color: '#06B6D4', 
-      glow: 'shadow-cyan-500/30',
-      icon: 'ShoppingBag', 
       avgPlatePrice: '₹120',
       topDish: 'Veg Manchurian Dry' 
     }
@@ -281,30 +354,58 @@ export default function ExecutiveDashboard({
   const totalCategoryVolume = categoryStats.reduce((sum, c) => sum + c.volume, 0);
   const totalCategoryRevenue = categoryStats.reduce((sum, c) => sum + c.revenue, 0);
 
-  // SVG Donut Calculations
+  // SVG Pie & Donut Angle Calculations
   const radius = 70;
   const circumference = 2 * Math.PI * radius; // ~439.82
-  let accumulatedOffset = 0;
-  const donutSegments = categoryStats.map((cat) => {
-    const value = pieMetric === 'volume' ? cat.volume : cat.revenue;
-    const total = pieMetric === 'volume' ? totalCategoryVolume : totalCategoryRevenue;
-    const share = (value / total) * 100;
-    const strokeLength = (share / 100) * circumference;
-    const dashoffset = -accumulatedOffset;
-    accumulatedOffset += strokeLength;
 
-    return {
-      ...cat,
-      share: share.toFixed(1),
-      strokeLength,
-      dashoffset
-    };
-  });
+  let accumulatedDonutOffset = 0;
+  let accumulatedAngle = 0;
+
+  const pieAndDonutSegments = useMemo(() => {
+    let currAngle = -Math.PI / 2; // start from top (12 o'clock)
+    let donutOffset = 0;
+
+    return categoryStats.map((cat) => {
+      const val = pieMetric === 'volume' ? cat.volume : cat.revenue;
+      const total = pieMetric === 'volume' ? totalCategoryVolume : totalCategoryRevenue;
+      const share = (val / total) * 100;
+      const angle = (share / 100) * (2 * Math.PI);
+
+      // Donut dash values
+      const strokeLength = (share / 100) * circumference;
+      const dashoffset = -donutOffset;
+      donutOffset += strokeLength;
+
+      // Solid Pie Path calculation
+      const startAngle = currAngle;
+      const endAngle = currAngle + angle;
+      currAngle += angle;
+
+      const pieR = 82;
+      const cx = 100;
+      const cy = 100;
+      const x1 = cx + pieR * Math.cos(startAngle);
+      const y1 = cy + pieR * Math.sin(startAngle);
+      const x2 = cx + pieR * Math.cos(endAngle);
+      const y2 = cy + pieR * Math.sin(endAngle);
+      const largeArcFlag = angle > Math.PI ? 1 : 0;
+      const piePath = `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${pieR} ${pieR} 0 ${largeArcFlag} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+
+      return {
+        ...cat,
+        share: share.toFixed(1),
+        strokeLength,
+        dashoffset,
+        piePath,
+        midAngle: (startAngle + endAngle) / 2
+      };
+    });
+  }, [categoryStats, pieMetric, totalCategoryVolume, totalCategoryRevenue, circumference]);
 
   const activeCategoryData = categoryStats.find(c => c.id === selectedSlice) || categoryStats[0];
 
-  // 2. DISH DEMAND & QUANTITY VOLUME MATRIX DATASET
-  const allDishes = useMemo(() => [
+  // 6. ALL-IN-ONE MENU ITEM COMMAND CENTER DATASET (11 ITEMS WITH LIVE EDITING & TOGGLES)
+  const defaultDishes = useMemo(() => [
     {
       id: 'd_01',
       rank: 1,
@@ -312,13 +413,14 @@ export default function ExecutiveDashboard({
       guj: 'માયસોર મસાલા ઢોસા',
       category: 'Mysore Dosa',
       price: 130,
+      costPrice: 42,
       volumeQty: 342,
       revenue: 44460,
-      revenueShare: 23.0,
       prepTime: '10m',
       rating: 4.9,
-      velocity: '🔥 High Velocity',
-      velocityType: 'hot',
+      isAvailable: true,
+      velocity: '🚀 Super Bestseller',
+      velocityType: 'super',
       margin: '68%',
       recommendation: 'Top cash cow. Maintain potato masala quality and promote Amul Cheese addon.'
     },
@@ -329,12 +431,13 @@ export default function ExecutiveDashboard({
       guj: 'બાહુબલી ઢોસા (જૈન ઉપલબ્ધ)',
       category: 'Fancy Dosa',
       price: 298,
+      costPrice: 112,
       volumeQty: 275,
       revenue: 81950,
-      revenueShare: 42.3,
       prepTime: '16m',
       rating: 4.9,
-      velocity: '🔥 Mega Revenue King',
+      isAvailable: true,
+      velocity: '🔥 High Velocity',
       velocityType: 'hot',
       margin: '62%',
       recommendation: 'Highest revenue contributor per table. Highlight on digital table menu standee.'
@@ -346,12 +449,13 @@ export default function ExecutiveDashboard({
       guj: 'અમૂલ બટર પાંઉભાજી',
       category: 'Pav Bhaji & Pulao',
       price: 80,
+      costPrice: 34,
       volumeQty: 254,
       revenue: 20320,
-      revenueShare: 10.5,
       prepTime: '8m',
       rating: 4.8,
-      velocity: '⚡ Fast Mover',
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
       velocityType: 'fast',
       margin: '58%',
       recommendation: 'Fastest turn time (8m). Always suggest extra pav bun addon in POS.'
@@ -363,150 +467,240 @@ export default function ExecutiveDashboard({
       guj: 'જીની રોલ ઢોસા',
       category: 'Fancy Dosa',
       price: 200,
+      costPrice: 72,
       volumeQty: 215,
       revenue: 43000,
-      revenueShare: 22.2,
       prepTime: '12m',
       rating: 4.8,
-      velocity: '⚡ High Demand',
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
       velocityType: 'fast',
-      margin: '65%',
-      recommendation: 'Viral favorite among youth. Excellent dinner peak volume.'
+      margin: '64%',
+      recommendation: 'Huge popularity with youths & couples. Keep grated cheese prep ready.'
     },
     {
       id: 'd_05',
       rank: 5,
-      name: 'S.P. Atmiya Mysore Dosa',
-      guj: 'સ્પે. આત્મીય માયસોર ઢોસા',
+      name: 'Paneer Mysore Dosa',
+      guj: 'પનીર માયસોર ઢોસા',
       category: 'Mysore Dosa',
-      price: 210,
-      volumeQty: 185,
-      revenue: 38850,
-      revenueShare: 20.1,
-      prepTime: '13m',
-      rating: 5.0,
-      velocity: '👑 Chef Signature',
-      velocityType: 'signature',
-      margin: '71%',
-      recommendation: 'Highest profit margin (71%). Recommend to VIP family tables.'
+      price: 150,
+      costPrice: 52,
+      volumeQty: 188,
+      revenue: 28200,
+      prepTime: '11m',
+      rating: 4.7,
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
+      velocityType: 'fast',
+      margin: '65%',
+      recommendation: 'Strong dinner preference. Fresh malai paneer cubes drive repeat orders.'
     },
     {
       id: 'd_06',
       rank: 6,
-      name: 'Surti Gotala Dosa',
-      guj: 'સુરતી ગોટાલા ઢોસા',
-      category: 'Fancy Dosa',
-      price: 220,
-      volumeQty: 148,
-      revenue: 32560,
-      revenueShare: 16.8,
-      prepTime: '14m',
-      rating: 4.7,
-      velocity: '⚡ Fast Mover',
-      velocityType: 'fast',
-      margin: '64%',
-      recommendation: 'Popular spicy dinner choice. Keep grated paneer prep ready by 7 PM.'
+      name: 'Cheese Paper Dosa',
+      guj: 'ચીઝ પેપર ઢોસા',
+      category: 'Plain Paper Dosa',
+      price: 110,
+      costPrice: 32,
+      volumeQty: 142,
+      revenue: 15620,
+      prepTime: '7m',
+      rating: 4.6,
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
+      velocityType: 'steady',
+      margin: '71%',
+      recommendation: 'Highest margin dish (71%). Low labor, great breakfast & snack item.'
     },
     {
       id: 'd_07',
       rank: 7,
-      name: 'Cheese Mysore Dosa',
-      guj: 'ચીઝ માયસોર ઢોસા',
-      category: 'Mysore Dosa',
-      price: 160,
-      volumeQty: 142,
-      revenue: 22720,
-      revenueShare: 11.7,
-      prepTime: '11m',
-      rating: 4.8,
-      velocity: '⭐ Steady',
+      name: 'Cheese Gotala Dosa',
+      guj: 'ચીઝ ગોટાલા ઢોસા',
+      category: 'Fancy Dosa',
+      price: 240,
+      costPrice: 90,
+      volumeQty: 126,
+      revenue: 30240,
+      prepTime: '14m',
+      rating: 4.7,
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
       velocityType: 'steady',
-      margin: '61%',
-      recommendation: 'Solid weekend orders. Ensure Amul cheese stock is replenished.'
+      margin: '63%',
+      recommendation: 'Surat specialty favorite. High ticket booster on weekend evenings.'
     },
     {
       id: 'd_08',
       rank: 8,
-      name: 'Sp. Atmiya Pulao',
-      guj: 'સ્પે. આત્મીય પુલાવ',
-      category: 'Pav Bhaji & Pulao',
-      price: 150,
-      volumeQty: 95,
-      revenue: 14250,
-      revenueShare: 7.4,
+      name: 'Veg Manchurian Dry',
+      guj: 'વેજ મંચુરિયન ડ્રાય',
+      category: 'Chinese & Starters',
+      price: 130,
+      costPrice: 54,
+      volumeQty: 98,
+      revenue: 12740,
       prepTime: '10m',
-      rating: 4.7,
-      velocity: '⭐ Steady',
+      rating: 4.5,
+      isAvailable: true,
+      velocity: '⚡ Steady Mover',
       velocityType: 'steady',
-      margin: '60%',
-      recommendation: 'Preferred dinner rice item. Good pairing with chaas.'
+      margin: '58%',
+      recommendation: 'Solid starter. Upsell with Cold Drink combo at ₹149.'
     },
-    // Underperforming / Dead Stock items with AI Recommendations
     {
       id: 'd_09',
       rank: 9,
-      name: 'Spring Roll Dosa (Chinese)',
-      guj: 'સ્પ્રિંગ રોલ ઢોસા',
+      name: 'Chinese Bhel (Crispy)',
+      guj: 'ચાઈનીઝ ભેળ',
       category: 'Chinese & Starters',
-      price: 250,
-      volumeQty: 18,
-      revenue: 4500,
-      revenueShare: 2.3,
-      prepTime: '13m',
+      price: 100,
+      costPrice: 48,
+      volumeQty: 32,
+      revenue: 3200,
+      prepTime: '6m',
       rating: 4.2,
-      velocity: '⚠️ Low Demand',
+      isAvailable: false,
+      velocity: '⚠️ Low Demand / Dead Stock',
       velocityType: 'low',
       margin: '52%',
-      recommendation: '💡 Attention: Underperforming. Create a "Chinese Combo (Spring Roll + Manchurian)" at ₹299 to drive trial.'
+      recommendation: 'Underperforming. Create combo with Soup or discount by 15% during 4-7 PM.'
     },
     {
       id: 'd_10',
       rank: 10,
-      name: 'Veg Hakka Noodles',
-      guj: 'વેજ હક્કા નૂડલ્સ',
-      category: 'Chinese & Starters',
-      price: 120,
-      volumeQty: 14,
-      revenue: 1680,
-      revenueShare: 0.9,
-      prepTime: '10m',
+      name: 'Idli Sambhar Plate (2 Pcs)',
+      guj: 'ઈડલી સંભાર (૨ નંગ)',
+      category: 'Plain Paper Dosa',
+      price: 60,
+      costPrice: 32,
+      volumeQty: 26,
+      revenue: 1560,
+      prepTime: '4m',
       rating: 4.1,
-      velocity: '⚠️ Dead Stock Risk',
+      isAvailable: true,
+      velocity: '⚠️ Low Demand / Dead Stock',
       velocityType: 'low',
-      margin: '48%',
-      recommendation: '💡 Attention: Low demand. Feature on top banner during evening 4-7 PM student snack hour or consider replacing with Schezwan Rice.'
+      margin: '47%',
+      recommendation: 'Morning demand is sluggish. Package with Medu Vada for a ₹75 Breakfast Special.'
     },
     {
       id: 'd_11',
       rank: 11,
-      name: 'Packaged Mineral Water (1L)',
-      guj: 'મિનરલ વોટર',
-      category: 'Beverages',
-      price: 20,
-      volumeQty: 22,
-      revenue: 440,
-      revenueShare: 0.2,
-      prepTime: '1m',
+      name: 'Sweet Corn Veg Soup',
+      guj: 'સ્વીટ કોર્ન સૂપ',
+      category: 'Chinese & Starters',
+      price: 90,
+      costPrice: 58,
+      volumeQty: 18,
+      revenue: 1620,
+      prepTime: '9m',
       rating: 4.0,
-      velocity: '💤 Slow Mover',
+      isAvailable: true,
+      velocity: '⚠️ Low Demand / Dead Stock',
       velocityType: 'low',
-      margin: '35%',
-      recommendation: '💡 Low profit ticket. Introduce Freshly Brewed South Indian Filter Coffee (₹35) and Fresh Mint Chaas (₹25) for 5x higher margins.'
+      margin: '36%',
+      recommendation: 'Lowest velocity dish. Replace with Hot & Sour or Manchow Soup for winter menu.'
     }
   ], []);
 
-  const maxDishVolume = Math.max(...allDishes.map(d => d.volumeQty));
+  // Synchronized dishes list (allowing inline availability toggle & price edit)
+  const [itemsList, setItemsList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('restaurant_dashboard_dishes');
+      return saved ? JSON.parse(saved) : defaultDishes;
+    } catch {
+      return defaultDishes;
+    }
+  });
 
+  // Handle Availability 1-Click Toggle
+  const handleToggleItemAvailability = (itemId) => {
+    const updated = itemsList.map(dish => {
+      if (dish.id === itemId) {
+        return { ...dish, isAvailable: !dish.isAvailable };
+      }
+      return dish;
+    });
+    setItemsList(updated);
+    try {
+      localStorage.setItem('restaurant_dashboard_dishes', JSON.stringify(updated));
+      window.dispatchEvent(new Event('restaurant_data_updated'));
+    } catch (e) {
+      console.warn(e);
+    }
+    const target = updated.find(d => d.id === itemId);
+    recordEmployeeActivity(
+      'DARSHIT RANA',
+      'admin',
+      'ITEM_AVAILABILITY_CHANGED',
+      `Toggled "${target.name}" to ${target.isAvailable ? 'AVAILABLE (In Stock)' : 'OUT OF STOCK'}`
+    );
+  };
+
+  // Handle Inline Price Edit Save
+  const handleSaveItemPrice = (itemId) => {
+    const newPrice = Number(editingPriceVal);
+    if (isNaN(newPrice) || newPrice <= 0) return;
+
+    const updated = itemsList.map(dish => {
+      if (dish.id === itemId) {
+        const cost = dish.costPrice || Math.round(dish.price * 0.4);
+        const marginVal = Math.round(((newPrice - cost) / newPrice) * 100);
+        return { 
+          ...dish, 
+          price: newPrice,
+          margin: `${marginVal}%`,
+          revenue: dish.volumeQty * newPrice
+        };
+      }
+      return dish;
+    });
+
+    setItemsList(updated);
+    setEditingItemId(null);
+    setEditingPriceVal('');
+
+    try {
+      localStorage.setItem('restaurant_dashboard_dishes', JSON.stringify(updated));
+      window.dispatchEvent(new Event('restaurant_data_updated'));
+    } catch (e) {
+      console.warn(e);
+    }
+
+    const target = updated.find(d => d.id === itemId);
+    recordEmployeeActivity(
+      'DARSHIT RANA',
+      'admin',
+      'MENU_PRICE_UPDATED',
+      `Updated price of "${target.name}" to ₹${newPrice}`
+    );
+  };
+
+  const maxDishVolume = Math.max(...itemsList.map(d => d.volumeQty));
+
+  // Filtered Dishes for All-in-One Command Table
   const filteredDishes = useMemo(() => {
-    return allDishes
+    return itemsList
       .filter(dish => {
-        if (demandTab === 'bestsellers') return dish.rank <= 8;
+        if (demandTab === 'bestsellers') return dish.rank <= 6;
         if (demandTab === 'low_demand') return dish.rank >= 9;
         return true;
       })
       .filter(dish => {
         if (selectedCategory === 'all') return true;
         return dish.category.toLowerCase().includes(selectedCategory.toLowerCase());
+      })
+      .filter(dish => {
+        if (selectedSlice !== 'all') {
+          const cat = categoryStats.find(c => c.id === selectedSlice);
+          if (cat) {
+            return dish.category.toLowerCase().includes(cat.name.toLowerCase());
+          }
+        }
+        return true;
       })
       .filter(dish => {
         if (!dishSearch.trim()) return true;
@@ -517,9 +711,10 @@ export default function ExecutiveDashboard({
         if (dishSortBy === 'volume') return b.volumeQty - a.volumeQty;
         if (dishSortBy === 'revenue') return b.revenue - a.revenue;
         if (dishSortBy === 'margin') return parseInt(b.margin) - parseInt(a.margin);
+        if (dishSortBy === 'price') return b.price - a.price;
         return a.rank - b.rank;
       });
-  }, [allDishes, demandTab, selectedCategory, dishSearch, dishSortBy]);
+  }, [itemsList, demandTab, selectedCategory, selectedSlice, dishSearch, dishSortBy, categoryStats]);
 
   // Hourly Peak Rush Heatmap Data
   const rushHours = [
@@ -600,7 +795,7 @@ export default function ExecutiveDashboard({
       total_amount: 390.00,
       opened_at: new Date(Date.now() - 8 * 60000).toISOString(),
       order_status: 'PLACED',
-      payment_method: 'ONLINE_RAZORPAY',
+      payment_method: 'ONLINE_UPI',
       payment_status: 'PAID',
       items_summary: '1x Bahubali Dosa (Jain), 2x Masala Chaas'
     },
@@ -619,18 +814,6 @@ export default function ExecutiveDashboard({
       items_summary: '2x S.P. Atmiya Mysore, 3x Butter Pav'
     }
   ];
-
-  const crmGuests = [
-    { id: 'g_01', name: 'Amit Patel', phone: '+91 98250 12345', visits: 8, total_spent: 2450, favorite: 'Mysore Masala Dosa', last_visit: 'Today, 02:40 PM', tier: 'VIP Gold' },
-    { id: 'g_02', name: 'Bhavin Shah', phone: '+91 99044 56789', visits: 4, total_spent: 1680, favorite: 'Bahubali Dosa (Jain)', last_visit: 'Today, 03:15 PM', tier: 'Regular' },
-    { id: 'g_03', name: 'Dr. Jignesh Mehta', phone: '+91 98980 44556', visits: 12, total_spent: 4920, favorite: 'S.P. Atmiya Mysore', last_visit: 'Today, 03:00 PM', tier: 'VIP Platinum' },
-    { id: 'g_04', name: 'Mehul Desai', phone: '+91 98791 22334', visits: 6, total_spent: 1980, favorite: 'Cheese Pav Bhaji', last_visit: 'Yesterday, 08:30 PM', tier: 'Regular' },
-    { id: 'g_05', name: 'Pooja Vora', phone: '+91 97240 88991', visits: 3, total_spent: 940, favorite: 'Jini Roll Dosa', last_visit: '16 Oct 2026', tier: 'New Customer' },
-    { id: 'g_06', name: 'Kiran Prajapati', phone: '+91 94270 33441', visits: 5, total_spent: 1520, favorite: 'Tawa Pulao', last_visit: '15 Oct 2026', tier: 'Regular' }
-  ].filter(g => 
-    g.name.toLowerCase().includes(crmSearch.toLowerCase()) || 
-    g.phone.includes(crmSearch)
-  );
 
   const handleSettleSession = async (session) => {
     if (!window.confirm(`Settle and close session for ${session.table_number || session.session_code}? Table will become clean and VACANT.`)) {
@@ -664,1005 +847,972 @@ export default function ExecutiveDashboard({
     }
   };
 
+  // Target Goal Calculations
+  const currentTodaySales = 18450;
+  const targetPercent = Math.min(100, Math.round((currentTodaySales / dailyTarget) * 100));
+
   return (
-    <div className={`space-y-6 pb-16 font-sans transition-colors duration-300 ${palette.textPrimary}`}>
+    <div className={`space-y-6 pb-20 font-sans transition-colors duration-200 ${palette.textPrimary}`}>
       
-      {/* 1. EXECUTIVE IDENTITY & TELEMETRY BAR */}
-      <div className={`p-6 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all`}>
+      {/* 1. EXECUTIVE IDENTITY & CUSTOMIZATION COMMAND BAR */}
+      <div className={`p-5 sm:p-6 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all`}>
         <div className="flex items-center space-x-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 via-amber-500 to-amber-400 text-slate-950 flex items-center justify-center font-black text-xl tracking-tight shadow-lg shadow-orange-500/20 shrink-0">
+          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center font-black text-xl tracking-tight shadow-md shadow-orange-500/20 shrink-0 font-heading">
             DR
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black font-heading tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black font-heading tracking-tight text-slate-900">
                 DARSHIT RANA
               </h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${isDark ? 'bg-slate-800/80 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-200'}`}>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                 Age 19 • Primary Restaurant Owner
               </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-bold border border-emerald-500/20 flex items-center space-x-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Supabase Cloud (Mumbai ap-south-1)</span>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200 flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Supabase Cloud (Mumbai ap-south-1) 🟢</span>
               </span>
             </div>
-            <p className={`text-xs ${palette.textSecondary} font-medium mt-1`}>
-              Atmiya Dosa Hub • Executive Food Intelligence & Restaurant Operations (Petlad, Anand)
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Atmiya Dosa Hub • Executive Restaurant Intelligence & Operations (Petlad, Anand)
             </p>
           </div>
         </div>
 
-        {/* Theme Pill Switcher & Quick Actions */}
+        {/* Action Controls: Customize View, Floor QRs, Add Item */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           
-          {/* Quick Theme Switcher */}
-          {onThemeChange && (
-            <div className={`flex items-center p-1 rounded-2xl border ${isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'} text-xs font-bold`}>
-              <button
-                onClick={() => onThemeChange('obsidian')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                  theme === 'obsidian' ? 'bg-orange-500 text-white shadow-xs font-black' : `${palette.textSecondary} hover:text-white`
-                }`}
-                title="Obsidian Dark Luxe"
-              >
-                <span>🌙 Obsidian</span>
-              </button>
-              <button
-                onClick={() => onThemeChange('sapphire')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                  theme === 'sapphire' ? 'bg-indigo-600 text-white shadow-xs font-black' : `${palette.textSecondary} hover:text-white`
-                }`}
-                title="Deep Royal Sapphire"
-              >
-                <span>💎 Sapphire</span>
-              </button>
-              <button
-                onClick={() => onThemeChange('light')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                  theme === 'light' ? 'bg-white text-zinc-900 shadow-xs font-black' : `${palette.textSecondary} hover:text-zinc-900`
-                }`}
-                title="Titanium Light"
-              >
-                <span>☀️ Light</span>
-              </button>
-            </div>
-          )}
+          {/* Quick Date Range Filter */}
+          <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700">
+            <button
+              onClick={() => setDateFilter('today')}
+              className={`px-3 py-1.5 rounded-xl transition ${dateFilter === 'today' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter('yesterday')}
+              className={`px-3 py-1.5 rounded-xl transition ${dateFilter === 'yesterday' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              Yesterday
+            </button>
+            <button
+              onClick={() => setDateFilter('7days')}
+              className={`px-3 py-1.5 rounded-xl transition ${dateFilter === '7days' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              7 Days
+            </button>
+          </div>
+
+          {/* CUSTOMIZE DASHBOARD BUTTON */}
+          <button
+            onClick={() => setShowCustomizeModal(true)}
+            className="flex items-center space-x-2 px-3.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Adjust & customize what you see on the dashboard"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-orange-600" />
+            <span>Customize View</span>
+          </button>
 
           <button
             onClick={onOpenGenerateQR}
-            className={`flex items-center space-x-2 px-4 py-2.5 rounded-2xl border ${isDark ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'} text-xs font-bold transition shadow-xs cursor-pointer`}
+            className="flex items-center space-x-2 px-3.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-xs font-bold transition shadow-xs cursor-pointer"
           >
-            <QrCode className="w-4 h-4 text-orange-400" />
-            <span>Floor & QRs</span>
+            <QrCode className="w-4 h-4 text-orange-500" />
+            <span>Floor QRs</span>
           </button>
           
           <button
             onClick={onOpenAddItem}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white text-xs font-bold transition shadow-md shadow-orange-500/25 cursor-pointer"
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold transition shadow-sm shadow-orange-500/25 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>New Menu Item</span>
+            <span>+ Add Menu Item</span>
           </button>
         </div>
       </div>
 
-      {/* 2. FOUR REFINED EXECUTIVE KPI TILES */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-        
-        {/* Metric 1: Total Revenue */}
-        <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg transition-all`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${palette.textSecondary}`}>Total Revenue</span>
-            <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center font-bold text-sm">
-              ₹
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono">
-              {currentDataset.total}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center text-[11px] font-bold text-emerald-400 space-x-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>+18.4% vs last period</span>
-          </div>
-        </div>
-
-        {/* Metric 2: Order & Plate Volume */}
-        <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg transition-all`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${palette.textSecondary}`}>Volume Tracked</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-              <ShoppingBag className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono">
-              {currentDataset.totalOrders} <span className="text-sm font-bold text-slate-500">tickets</span>
-            </span>
-          </div>
-          <div className={`mt-2 text-[11px] font-semibold ${palette.textSecondary}`}>
-            {currentDataset.totalVolume} Total Plates Served
-          </div>
-        </div>
-
-        {/* Metric 3: Avg Ticket Size */}
-        <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg transition-all`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${palette.textSecondary}`}>Avg Ticket (AOV)</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono">
-              ₹249.32
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] font-bold text-emerald-400">
-            Target ₹220+ exceeded by 13%
-          </div>
-        </div>
-
-        {/* Metric 4: Floor Utilization */}
-        <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg transition-all`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${palette.textSecondary}`}>Active Occupancy</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono">
-              3 / 10 Tables
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] font-bold text-blue-400">
-            30% Current Floor Seated
-          </div>
-        </div>
-
-      </div>
-
-      {/* 3. DUAL-METRIC SALES VELOCITY & ORDER VOLUME ENGINE (NO CHEAP CAPSULES!) */}
-      <div className={`p-6 sm:p-7 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xl space-y-5 transition-all`}>
-        
-        {/* Header with Metric & Timeframe Controls */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-2">
-              <Activity className="w-5 h-5 text-orange-400" />
-              <h2 className="text-base sm:text-lg font-black font-heading">
-                {currentDataset.title}
-              </h2>
-            </div>
-            <p className={`text-xs ${palette.textSecondary} font-medium mt-0.5`}>
-              {currentDataset.subtitle}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            
-            {/* Metric Mode Toggle: Revenue vs Volume */}
-            <div className={`flex items-center p-1 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} text-xs font-bold`}>
-              <button
-                onClick={() => setChartMetric('revenue')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                  chartMetric === 'revenue' 
-                    ? 'bg-orange-500 text-white shadow-xs font-black' 
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                <span>₹ Revenue</span>
-              </button>
-              <button
-                onClick={() => setChartMetric('volume')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                  chartMetric === 'volume' 
-                    ? 'bg-purple-600 text-white shadow-xs font-black' 
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                <span>📦 Order Volume</span>
-              </button>
-            </div>
-
-            {/* Timeframe Pill Switcher */}
-            <div className={`flex items-center p-1 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} text-xs font-bold`}>
-              <button
-                onClick={() => { setTimeframe('hourly'); setSelectedPointIndex(5); }}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                  timeframe === 'hourly' 
-                    ? 'bg-slate-800 text-white font-black shadow-xs' 
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                Today (Hourly)
-              </button>
-              <button
-                onClick={() => { setTimeframe('weekly'); setSelectedPointIndex(5); }}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                  timeframe === 'weekly' 
-                    ? 'bg-slate-800 text-white font-black shadow-xs' 
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                This Week
-              </button>
-              <button
-                onClick={() => { setTimeframe('monthly'); setSelectedPointIndex(3); }}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                  timeframe === 'monthly' 
-                    ? 'bg-slate-800 text-white font-black shadow-xs' 
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                This Month
-              </button>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Active Inspection Milestone Card */}
-        <div className={`p-4 rounded-2xl border ${isDark ? 'bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-900/90 border-slate-800' : 'bg-gradient-to-r from-orange-50/70 via-amber-50/40 to-white border-orange-200/60'} flex flex-wrap items-center justify-between gap-3 text-xs`}>
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-slate-950 flex items-center justify-center font-black text-xs shadow-md shadow-orange-500/20 font-mono">
-              {activePoint.label}
-            </div>
-            <div>
-              <div className="flex items-center space-x-2.5">
-                <span className="font-black text-base font-mono">
-                  {chartMetric === 'revenue' 
-                    ? `₹${activePoint.revenue.toLocaleString('en-IN')}`
-                    : `${activePoint.volume || activePoint.orders * 2} Plates`}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-bold text-[10px] border border-orange-500/30">
-                  {activePoint.status}
-                </span>
-              </div>
-              <p className={`text-[11px] ${palette.textSecondary} mt-0.5`}>
-                Tickets: <strong className="text-slate-200">{activePoint.orders} orders</strong> • Top Demanded: <strong className="text-amber-400">{activePoint.peakDish}</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-3 text-[11px]">
-            <span className={`px-2.5 py-1 rounded-xl ${isDark ? 'bg-slate-800/80 text-slate-300' : 'bg-white text-slate-700'} border ${palette.cardBorder} font-mono font-bold`}>
-              ⚡ Avg Turn: 18m
-            </span>
-            <span className="text-slate-500 hidden sm:inline">
-              Click any column below to inspect that time milestone
-            </span>
-          </div>
-        </div>
-
-        {/* Precision Modern Chart Canvas */}
-        <div className="pt-2 relative">
+      {/* 2. EXECUTIVE KPIS + EDITABLE DAILY SALES GOAL METER */}
+      {dashboardConfig.showKpis && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
           
-          {/* Subtle Grid Guidelines with Exact Axis Units */}
-          <div className="absolute inset-x-0 top-10 bottom-14 flex flex-col justify-between pointer-events-none opacity-30">
-            <div className="border-b border-dashed border-slate-700 w-full flex justify-end pr-2 text-[10px] font-mono text-slate-400">
-              {chartMetric === 'revenue' ? `₹${maxRevenue.toLocaleString('en-IN')}` : `${maxVolume} Plates`}
-            </div>
-            <div className="border-b border-dashed border-slate-700 w-full flex justify-end pr-2 text-[10px] font-mono text-slate-400">
-              {chartMetric === 'revenue' ? `₹${Math.round(maxRevenue * 0.66).toLocaleString('en-IN')}` : `${Math.round(maxVolume * 0.66)} Plates`}
-            </div>
-            <div className="border-b border-dashed border-slate-700 w-full flex justify-end pr-2 text-[10px] font-mono text-slate-400">
-              {chartMetric === 'revenue' ? `₹${Math.round(maxRevenue * 0.33).toLocaleString('en-IN')}` : `${Math.round(maxVolume * 0.33)} Plates`}
-            </div>
-            <div className="border-b border-dashed border-slate-700 w-full flex justify-end pr-2 text-[10px] font-mono text-slate-400">
-              0
-            </div>
-          </div>
-
-          {/* Ambient SVG Spline Wave */}
-          <div className="absolute inset-x-0 top-6 bottom-14 pointer-events-none overflow-hidden">
-            <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="w-full h-full">
-              <defs>
-                <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={chartMetric === 'revenue' ? '#F59E0B' : '#8B5CF6'} stopOpacity="0.25" />
-                  <stop offset="100%" stopColor={chartMetric === 'revenue' ? '#F59E0B' : '#8B5CF6'} stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d={areaPath} fill="url(#velocityGrad)" />
-              <path 
-                d={splinePath} 
-                fill="none" 
-                stroke={chartMetric === 'revenue' ? '#F59E0B' : '#8B5CF6'} 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-              />
-              {svgCoords.map((c, i) => (
-                <circle 
-                  key={i} 
-                  cx={c.x} 
-                  cy={c.y} 
-                  r={activePointIndex === i ? 6 : 3.5} 
-                  fill={activePointIndex === i ? '#ffffff' : (chartMetric === 'revenue' ? '#F59E0B' : '#8B5CF6')} 
-                  stroke={chartMetric === 'revenue' ? '#F59E0B' : '#8B5CF6'} 
-                  strokeWidth="2.5" 
-                />
-              ))}
-            </svg>
-          </div>
-
-          {/* Precision Sleek Interactive Data Columns */}
-          <div 
-            className="relative z-10 grid gap-2 sm:gap-4 items-end h-60 sm:h-64 pb-2"
-            style={{ gridTemplateColumns: `repeat(${currentDataset.points.length}, minmax(0, 1fr))` }}
-          >
-            {currentDataset.points.map((pt, index) => {
-              const isSelected = activePointIndex === index;
-              const value = chartMetric === 'revenue' ? pt.revenue : (pt.volume || pt.orders * 2.2);
-              const maxValue = chartMetric === 'revenue' ? maxRevenue : maxVolume;
-              const heightPercent = Math.max(16, Math.round((value / maxValue) * 100));
-
-              return (
-                <div 
-                  key={index}
-                  onClick={() => setSelectedPointIndex(index)}
-                  className="flex flex-col items-center justify-end h-full group cursor-pointer relative"
-                >
-                  {/* Floating Value Tag */}
-                  <div className={`mb-2 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black transition-all whitespace-nowrap shadow-sm ${
-                    isSelected 
-                      ? 'bg-orange-500 text-white scale-110 shadow-orange-500/40 ring-2 ring-orange-400/30' 
-                      : `${isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-zinc-700 border-zinc-200'} border group-hover:border-orange-400 group-hover:text-white`
-                  }`}>
-                    {chartMetric === 'revenue'
-                      ? (pt.revenue >= 100000 ? `₹${(pt.revenue / 100000).toFixed(2)}L` : (pt.revenue >= 1000 ? `₹${(pt.revenue / 1000).toFixed(1)}k` : `₹${pt.revenue}`))
-                      : `${pt.volume || pt.orders * 2}p`}
-                  </div>
-
-                  {/* Sleek Vertical Pillar Column */}
-                  <div className={`w-full max-w-[42px] h-36 sm:h-40 flex flex-col justify-end items-center rounded-xl p-1 transition-all ${
-                    isDark ? 'bg-slate-900/70 border border-slate-800/80 group-hover:border-slate-700' : 'bg-slate-100 border border-slate-200/70'
-                  }`}>
-                    <div 
-                      style={{ height: `${heightPercent}%`, minHeight: '18px' }}
-                      className={`w-full rounded-lg transition-all duration-300 relative overflow-hidden flex flex-col justify-between items-center py-1 ${
-                        isSelected 
-                          ? (chartMetric === 'revenue' 
-                              ? 'bg-gradient-to-t from-orange-600 via-amber-500 to-amber-300 shadow-md shadow-orange-500/40' 
-                              : 'bg-gradient-to-t from-purple-700 via-purple-500 to-indigo-300 shadow-md shadow-purple-500/40')
-                          : (isDark 
-                              ? 'bg-gradient-to-t from-slate-800 via-slate-700 to-slate-700 group-hover:from-orange-500/80 group-hover:to-amber-400' 
-                              : 'bg-gradient-to-t from-zinc-300 to-zinc-200 group-hover:from-orange-400 group-hover:to-amber-300')
-                      }`}
-                    >
-                      {/* Apex glow dot */}
-                      <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white shadow-xs' : 'bg-white/40'}`} />
-                    </div>
-                  </div>
-
-                  {/* Column Bottom Label */}
-                  <div className="text-center mt-2">
-                    <span className={`block text-xs font-bold transition-colors ${
-                      isSelected ? 'text-orange-400 font-black' : `${palette.textSecondary} group-hover:text-white`
-                    }`}>
-                      {pt.label}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {pt.orders} tickets
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* 4. MAIN OPERATIONS TABS NAVIGATION */}
-      <div className={`flex items-center space-x-2 border-b ${palette.cardBorder} pb-3 overflow-x-auto`}>
-        <button
-          onClick={() => setActiveTab('demand')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer ${
-            activeTab === 'demand'
-              ? 'bg-orange-500 text-white shadow-md shadow-orange-500/25'
-              : `${isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300' : 'bg-white hover:bg-slate-100 text-zinc-700'} border ${palette.cardBorder}`
-          }`}
-        >
-          <Trophy className="w-3.5 h-3.5" />
-          <span>Dish Demand & Volume Matrix ({allDishes.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('pie_chart')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer ${
-            activeTab === 'pie_chart'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
-              : `${isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300' : 'bg-white hover:bg-slate-100 text-zinc-700'} border ${palette.cardBorder}`
-          }`}
-        >
-          <PieChartIcon className="w-3.5 h-3.5" />
-          <span>Category Volume Donut / Pie ({categoryStats.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('rush_hours')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer ${
-            activeTab === 'rush_hours'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
-              : `${isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300' : 'bg-white hover:bg-slate-100 text-zinc-700'} border ${palette.cardBorder}`
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>Peak Dining Rush Heatmap</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('sessions')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer ${
-            activeTab === 'sessions'
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
-              : `${isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300' : 'bg-white hover:bg-slate-100 text-zinc-700'} border ${palette.cardBorder}`
-          }`}
-        >
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Live Table Sessions ({displaySessions.filter(s => s.status === 'ACTIVE').length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('crm')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shrink-0 cursor-pointer ${
-            activeTab === 'crm'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
-              : `${isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300' : 'bg-white hover:bg-slate-100 text-zinc-700'} border ${palette.cardBorder}`
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>Customer CRM & VIPs ({crmGuests.length})</span>
-        </button>
-      </div>
-
-      {/* TAB 1: DISH DEMAND & QUANTITY VOLUME MATRIX (DIRECT USER REQUIREMENT!) */}
-      {activeTab === 'demand' && (
-        <div className="space-y-5">
-          
-          {/* Controls Bar: Sub-Tabs, Search, and Category Filters */}
-          <div className={`p-4 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4`}>
-            
-            {/* Filter Sub-Tabs */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setDemandTab('bestsellers')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                  demandTab === 'bestsellers'
-                    ? 'bg-orange-500 text-white shadow-sm font-black'
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                <Flame className="w-3.5 h-3.5" />
-                <span>🔥 Most Demanded (Bestsellers)</span>
-              </button>
-
-              <button
-                onClick={() => setDemandTab('low_demand')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                  demandTab === 'low_demand'
-                    ? 'bg-rose-500 text-white shadow-sm font-black'
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>⚠️ Low Demand / Dead Stock (Action Needed)</span>
-              </button>
-
-              <button
-                onClick={() => setDemandTab('all')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  demandTab === 'all'
-                    ? 'bg-slate-800 text-white shadow-sm font-black'
-                    : `${palette.textSecondary} hover:text-white`
-                }`}
-              >
-                All Menu Items ({allDishes.length})
-              </button>
-            </div>
-
-            {/* Search & Sort Controls */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Filter dish by name..."
-                  value={dishSearch}
-                  onChange={(e) => setDishSearch(e.target.value)}
-                  className={`pl-9 pr-3 py-1.5 rounded-xl ${isDark ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-100 border-slate-200 text-zinc-900'} border text-xs font-medium focus:outline-none focus:ring-1 focus:ring-orange-500`}
-                />
-              </div>
-
-              {/* Sort By Switcher */}
-              <div className={`flex items-center p-1 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-zinc-600'} text-xs font-bold`}>
-                <span className="px-2 text-[10px] uppercase font-bold text-slate-500">Sort:</span>
-                <button
-                  onClick={() => setDishSortBy('volume')}
-                  className={`px-2.5 py-1 rounded-lg transition ${dishSortBy === 'volume' ? 'bg-orange-500 text-white' : 'hover:text-white'}`}
-                >
-                  Volume (Qty)
-                </button>
-                <button
-                  onClick={() => setDishSortBy('revenue')}
-                  className={`px-2.5 py-1 rounded-lg transition ${dishSortBy === 'revenue' ? 'bg-orange-500 text-white' : 'hover:text-white'}`}
-                >
-                  Revenue (₹)
-                </button>
-                <button
-                  onClick={() => setDishSortBy('margin')}
-                  className={`px-2.5 py-1 rounded-lg transition ${dishSortBy === 'margin' ? 'bg-orange-500 text-white' : 'hover:text-white'}`}
-                >
-                  Margin %
-                </button>
+          {/* Tile 1: Total Revenue */}
+          <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xs hover:shadow-sm transition`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Today's Revenue</span>
+              <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-sm">
+                ₹
               </div>
             </div>
-
-          </div>
-
-          {/* Full Particular Records Matrix Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredDishes.map((dish) => {
-              const isTop3 = dish.rank <= 3;
-              const isLow = dish.rank >= 9;
-              const volumePercent = Math.round((dish.volumeQty / maxDishVolume) * 100);
-
-              return (
-                <div 
-                  key={dish.id}
-                  className={`p-5 rounded-3xl ${palette.cardBg} border ${isLow ? 'border-rose-500/30 ring-1 ring-rose-500/20' : (isTop3 ? 'border-amber-500/40 ring-1 ring-amber-500/20' : palette.cardBorder)} shadow-xl space-y-3.5 transition-all hover:scale-[1.01]`}
-                >
-                  {/* Card Header: Rank, Name, Category, Price */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 font-mono shadow-md ${
-                        dish.rank === 1 
-                          ? 'bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 shadow-amber-500/30' 
-                          : dish.rank === 2 
-                          ? 'bg-gradient-to-tr from-slate-300 to-slate-100 text-slate-900 shadow-slate-300/30' 
-                          : dish.rank === 3 
-                          ? 'bg-gradient-to-tr from-amber-700 to-orange-500 text-white shadow-amber-700/30' 
-                          : (isLow ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-300')
-                      }`}>
-                        #{dish.rank}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-sm font-black tracking-tight">{dish.name}</h3>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                            isLow 
-                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          }`}>
-                            {dish.velocity}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-medium">
-                          {dish.guj} • <span className="text-amber-400 font-bold">{dish.category}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="text-base font-black font-mono">₹{dish.price}</span>
-                      <span className="block text-[10px] text-emerald-400 font-bold">{dish.margin} Margin</span>
-                    </div>
-                  </div>
-
-                  {/* Volume vs Revenue Metrics Bar */}
-                  <div className={`p-3 rounded-2xl ${palette.innerBox} space-y-2`}>
-                    <div className="flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-slate-400">Total Plates Sold: </span>
-                        <strong className="text-slate-100 font-mono font-black">{dish.volumeQty} plates</strong>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-slate-400">Total Revenue: </span>
-                        <strong className="text-amber-400 font-mono font-black">₹{dish.revenue.toLocaleString('en-IN')}</strong>
-                        <span className="text-[10px] text-slate-500 ml-1 font-mono">({dish.revenueShare}%)</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar of Volume */}
-                    <div className="w-full bg-slate-800/90 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          isLow 
-                            ? 'bg-rose-500' 
-                            : (isTop3 ? 'bg-gradient-to-r from-amber-500 to-orange-500' : 'bg-emerald-500')
-                        }`}
-                        style={{ width: `${volumePercent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* AI Recommendation / Chef Insight */}
-                  <div className={`p-3 rounded-2xl text-[11px] leading-relaxed border ${
-                    isLow 
-                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
-                      : (isTop3 ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' : 'bg-slate-800/60 border-slate-700/60 text-slate-300')
-                  }`}>
-                    {dish.recommendation}
-                  </div>
-
-                  {/* Quick Card Footer: Rating, Prep Time */}
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1">
-                    <span>⭐ {dish.rating} Customer Rating</span>
-                    <span>⏱️ {dish.prepTime} Avg Prep Time</span>
-                  </div>
-
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB 2: INTERACTIVE CATEGORY VOLUME & REVENUE DONUT / PIE CHART (DIRECT USER REQUIREMENT!) */}
-      {activeTab === 'pie_chart' && (
-        <div className="space-y-6">
-          
-          <div className={`p-6 sm:p-7 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xl space-y-6`}>
-            
-            {/* Header & Toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <PieChartIcon className="w-5 h-5 text-purple-400" />
-                  <h2 className="text-base sm:text-lg font-black font-heading">
-                    Category Volume & Revenue Distribution
-                  </h2>
-                </div>
-                <p className={`text-xs ${palette.textSecondary} font-medium mt-0.5`}>
-                  Visualizing dining demand share across all 5 culinary categories ({totalCategoryVolume} plates total)
-                </p>
-              </div>
-
-              {/* Metric Toggle: Volume (Plates) vs Revenue (₹) */}
-              <div className={`flex items-center p-1 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} text-xs font-bold`}>
-                <button
-                  onClick={() => setPieMetric('volume')}
-                  className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                    pieMetric === 'volume' 
-                      ? 'bg-purple-600 text-white shadow-xs font-black' 
-                      : `${palette.textSecondary} hover:text-white`
-                  }`}
-                >
-                  <span>📦 By Volume (Plates)</span>
-                </button>
-                <button
-                  onClick={() => setPieMetric('revenue')}
-                  className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-                    pieMetric === 'revenue' 
-                      ? 'bg-orange-500 text-white shadow-xs font-black' 
-                      : `${palette.textSecondary} hover:text-white`
-                  }`}
-                >
-                  <span>₹ By Revenue Share</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Donut Chart + Deep Breakdown Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              
-              {/* Left Column: Interactive SVG Donut Visual */}
-              <div className="lg:col-span-5 flex flex-col items-center justify-center relative p-4">
-                <div className="relative w-64 h-64 sm:w-72 sm:h-72">
-                  <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90 transform">
-                    {donutSegments.map((segment) => {
-                      const isHovered = hoveredSlice === segment.id;
-                      const isSelected = selectedSlice === segment.id;
-
-                      return (
-                        <circle
-                          key={segment.id}
-                          cx="100"
-                          cy="100"
-                          r={radius}
-                          fill="none"
-                          stroke={segment.color}
-                          strokeWidth={isSelected ? '28' : (isHovered ? '24' : '20')}
-                          strokeDasharray={`${segment.strokeLength} ${circumference}`}
-                          strokeDashoffset={segment.dashoffset}
-                          strokeLinecap="round"
-                          onClick={() => setSelectedSlice(segment.id)}
-                          onMouseEnter={() => setHoveredSlice(segment.id)}
-                          onMouseLeave={() => setHoveredSlice(null)}
-                          className="cursor-pointer transition-all duration-300 hover:opacity-100"
-                          style={{
-                            filter: isSelected ? `drop-shadow(0px 0px 8px ${segment.color})` : 'none',
-                            opacity: (selectedSlice && !isSelected && !isHovered) ? 0.75 : 1
-                          }}
-                        />
-                      );
-                    })}
-                  </svg>
-
-                  {/* Donut Center Display */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                      {pieMetric === 'volume' ? 'Total Volume' : 'Total Revenue'}
-                    </span>
-                    <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white mt-0.5">
-                      {pieMetric === 'volume' ? `${totalCategoryVolume}p` : `₹${(totalCategoryRevenue / 1000).toFixed(1)}k`}
-                    </span>
-                    <span className="text-[10px] text-emerald-400 font-bold mt-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                      100% Demand Tracked
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-slate-500 mt-2 font-medium">
-                  💡 Click or hover any donut slice to inspect category performance
-                </p>
-              </div>
-
-              {/* Right Column: Category Breakdown Cards & Active Selection */}
-              <div className="lg:col-span-7 space-y-3">
-                
-                {/* Active Inspected Category Callout Banner */}
-                <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'} flex items-center justify-between`}>
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full shrink-0 shadow-md"
-                      style={{ backgroundColor: activeCategoryData.color }}
-                    />
-                    <div>
-                      <h4 className="text-sm font-black">{activeCategoryData.name} ({activeCategoryData.guj})</h4>
-                      <p className="text-[11px] text-slate-400 font-medium">
-                        Top Demand Item: <strong className="text-white">{activeCategoryData.topDish}</strong> • Avg Price: {activeCategoryData.avgPlatePrice}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-base font-black font-mono text-white">
-                      {pieMetric === 'volume' ? `${activeCategoryData.volume} Plates` : `₹${activeCategoryData.revenue.toLocaleString('en-IN')}`}
-                    </span>
-                    <span className="block text-[10px] text-emerald-400 font-bold">
-                      {activeCategoryData.percentage}% Demand Share
-                    </span>
-                  </div>
-                </div>
-
-                {/* List of all categories with progress bars */}
-                <div className="space-y-2.5">
-                  {donutSegments.map((cat, idx) => {
-                    const isSelected = selectedSlice === cat.id;
-
-                    return (
-                      <div 
-                        key={cat.id}
-                        onClick={() => setSelectedSlice(cat.id)}
-                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                          isSelected 
-                            ? 'bg-slate-800/90 border-slate-700 shadow-md ring-1 ring-slate-600' 
-                            : `${isDark ? 'bg-slate-900/50 hover:bg-slate-800/50 border-slate-800' : 'bg-white hover:bg-slate-50 border-slate-200'}`
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <span className="font-mono font-bold text-xs text-slate-500 w-4">#{idx + 1}</span>
-                          <div 
-                            className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
-                            style={{ backgroundColor: cat.color }}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold truncate">{cat.name}</span>
-                              <span className="font-mono font-black text-slate-200">
-                                {pieMetric === 'volume' ? `${cat.volume} plates` : `₹${cat.revenue.toLocaleString('en-IN')}`}
-                              </span>
-                            </div>
-                            
-                            {/* Proportional Bar */}
-                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
-                              <div 
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${cat.share}%`, backgroundColor: cat.color }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-right pl-3 shrink-0">
-                          <span className="px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700">
-                            {cat.share}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB 3: HOURLY PEAK DINING RUSH HEATMAP */}
-      {activeTab === 'rush_hours' && (
-        <div className="space-y-4">
-          <div className={`p-6 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xl space-y-4`}>
-            <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-blue-400" />
-              <div>
-                <h3 className="text-base font-black font-heading">Kitchen Load & Rush Hour Heatmap</h3>
-                <p className={`text-xs ${palette.textSecondary} font-medium`}>
-                  Historical order frequency to optimize tawa preparation and staff allocation
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {rushHours.map((slot, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                    slot.rush === 'HOUSEFULL' 
-                      ? 'bg-rose-500/10 border-rose-500/30' 
-                      : (slot.rush === 'High' ? 'bg-amber-500/10 border-amber-500/30' : `${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`)
-                  }`}
-                >
-                  <div className="flex items-center space-x-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs font-mono">
-                      #{idx + 1}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-sm">{slot.hour}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          slot.rush === 'HOUSEFULL' ? 'bg-rose-500 text-white' : (slot.rush === 'High' ? 'bg-amber-500 text-slate-950' : 'bg-slate-700 text-slate-300')
-                        }`}>
-                          {slot.rush}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">{slot.session}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Tickets:</span>
-                      <strong className="text-slate-100">{slot.orders} orders</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Volume:</span>
-                      <strong className="text-amber-400">{slot.plates} plates</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Turnaround:</span>
-                      <strong className="text-emerald-400">{slot.speed}</strong>
-                    </div>
-                    <div className="min-w-[120px]">
-                      <span className="text-slate-400 block text-[10px]">Kitchen Load ({slot.load}):</span>
-                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-1">
-                        <div 
-                          className={`h-full ${slot.rush === 'HOUSEFULL' ? 'bg-rose-500' : 'bg-amber-500'}`}
-                          style={{ width: slot.load }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-[11px] max-w-xs">
-                    💡 {slot.tip}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: ACTIVE TABLE SESSIONS (LIVE FLOOR RECOVERY) */}
-      {activeTab === 'sessions' && (
-        <div className="space-y-4">
-          
-          {/* Architecture Guardrail Banner */}
-          <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-zinc-50 border-zinc-200'} flex items-center justify-between text-xs`}>
-            <div className="flex items-center space-x-2.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className={palette.textSecondary}>
-                <strong className="text-white">Persistent Session Rule Active:</strong> Customer browser refresh does not lose order state. Sessions terminate only upon food delivery and bill settlement.
+            <div className="mt-3">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-slate-900">
+                {currentDataset.total}
               </span>
             </div>
-            <button 
+            <div className="mt-2 flex items-center text-[11px] font-bold text-emerald-600 space-x-1">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>+18.4% vs yesterday</span>
+            </div>
+          </div>
+
+          {/* Tile 2: Volume Tracked */}
+          <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xs hover:shadow-sm transition`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Volume Tracked</span>
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-slate-900">
+                {currentDataset.totalVolume} Plates
+              </span>
+            </div>
+            <div className="mt-2 text-[11px] font-bold text-purple-600">
+              Across {currentDataset.totalOrders} dining tickets
+            </div>
+          </div>
+
+          {/* Tile 3: Average Order Value */}
+          <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xs hover:shadow-sm transition`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Avg Ticket (AOV)</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                AOV
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-slate-900">
+                ₹249
+              </span>
+            </div>
+            <div className="mt-2 text-[11px] font-bold text-emerald-600">
+              Target ₹220+ exceeded by 13%
+            </div>
+          </div>
+
+          {/* Tile 4: Active Occupancy */}
+          <div className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-xs hover:shadow-sm transition`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Floor Seated</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-slate-900">
+                3 / 10 Tables
+              </span>
+            </div>
+            <div className="mt-2 text-[11px] font-bold text-blue-600">
+              30% Current Floor Seated
+            </div>
+          </div>
+
+          {/* Tile 5: EDITABLE DAILY SALES GOAL CARD */}
+          <div className={`col-span-2 lg:col-span-1 p-5 rounded-3xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 relative overflow-hidden flex flex-col justify-between`}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-orange-100">Daily Target Goal</span>
+              <button
+                onClick={() => { setIsEditingTarget(true); setTargetInputVal(dailyTarget); }}
+                className="text-[10px] font-bold bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-lg transition cursor-pointer flex items-center space-x-1"
+                title="Click to edit your daily target goal"
+              >
+                <Edit2 className="w-2.5 h-2.5" />
+                <span>Edit Goal</span>
+              </button>
+            </div>
+
+            {isEditingTarget ? (
+              <div className="mt-2 bg-white/95 p-2 rounded-xl text-slate-900 flex items-center space-x-1.5">
+                <span className="font-bold text-xs">₹</span>
+                <input
+                  type="number"
+                  value={targetInputVal}
+                  onChange={(e) => setTargetInputVal(e.target.value)}
+                  className="w-full text-xs font-mono font-bold focus:outline-none"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveDailyTarget}
+                  className="px-2 py-1 rounded bg-orange-600 text-white text-[10px] font-bold hover:bg-orange-700"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-2xl font-black font-mono tracking-tight">
+                    {targetPercent}%
+                  </span>
+                  <span className="text-xs font-mono opacity-90">
+                    ₹{currentTodaySales.toLocaleString()} / ₹{dailyTarget.toLocaleString()}
+                  </span>
+                </div>
+                
+                {/* Target Progress Bar */}
+                <div className="w-full h-2 rounded-full bg-black/20 mt-2 overflow-hidden">
+                  <div 
+                    style={{ width: `${targetPercent}%` }} 
+                    className="h-full bg-white rounded-full transition-all duration-500"
+                  />
+                </div>
+                <span className="block text-[10px] opacity-90 mt-1 font-medium">
+                  {targetPercent >= 100 ? '🎉 Goal Achieved!' : `₹${(dailyTarget - currentTodaySales).toLocaleString()} remaining`}
+                </span>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* 3. UNIFIED VISUAL ANALYTICS: INTERACTIVE CATEGORY PIE CHART + SALES VELOCITY WAVE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* LEFT / PIE CHART (6 COLS): WORLD-CLASS INTERACTIVE PIE & DONUT VISUALIZER */}
+        {dashboardConfig.showPieChart && (
+          <div className="lg:col-span-6 p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm space-y-5 transition-all">
+            
+            {/* Header with Visual Style & Metric Toggles */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <PieChartIcon className="w-5 h-5 text-orange-500" />
+                  <h2 className="text-base font-black font-heading text-slate-900">
+                    Category Demand Pie & Volume
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Click any slice to filter and inspect items in that category
+                </p>
+              </div>
+
+              {/* Toggles: Donut vs Pie & Volume vs Revenue */}
+              <div className="flex flex-wrap items-center gap-2">
+                
+                {/* Pie vs Donut Style Toggle */}
+                <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                  <button
+                    onClick={() => { setPieChartStyle('donut'); updateConfig('chartType', 'donut'); }}
+                    className={`px-2.5 py-1 rounded-xl transition ${pieChartStyle === 'donut' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    🍩 Donut
+                  </button>
+                  <button
+                    onClick={() => { setPieChartStyle('pie'); updateConfig('chartType', 'pie'); }}
+                    className={`px-2.5 py-1 rounded-xl transition ${pieChartStyle === 'pie' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    🍰 Pie
+                  </button>
+                </div>
+
+                {/* Metric: Volume vs Revenue */}
+                <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                  <button
+                    onClick={() => setPieMetric('volume')}
+                    className={`px-2.5 py-1 rounded-xl transition ${pieMetric === 'volume' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    📦 Plates
+                  </button>
+                  <button
+                    onClick={() => setPieMetric('revenue')}
+                    className={`px-2.5 py-1 rounded-xl transition ${pieMetric === 'revenue' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    ₹ Revenue
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            {/* SVG Canvas & Rich Legend */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+              
+              {/* SVG Visual (Solid Pie or Donut) */}
+              <div className="sm:col-span-6 flex flex-col items-center justify-center relative p-2">
+                <div className="relative w-56 h-56 sm:w-60 sm:h-60">
+                  
+                  {pieChartStyle === 'donut' ? (
+                    /* DONUT CHART */
+                    <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90 transform">
+                      {pieAndDonutSegments.map((segment) => {
+                        const isHovered = hoveredSlice === segment.id;
+                        const isSelected = selectedSlice === segment.id;
+
+                        return (
+                          <circle
+                            key={segment.id}
+                            cx="100"
+                            cy="100"
+                            r={radius}
+                            fill="none"
+                            stroke={segment.color}
+                            strokeWidth={isSelected ? '28' : (isHovered ? '25' : '21')}
+                            strokeDasharray={`${segment.strokeLength} ${circumference}`}
+                            strokeDashoffset={segment.dashoffset}
+                            strokeLinecap="round"
+                            onClick={() => setSelectedSlice(selectedSlice === segment.id ? 'all' : segment.id)}
+                            onMouseEnter={() => setHoveredSlice(segment.id)}
+                            onMouseLeave={() => setHoveredSlice(null)}
+                            className="cursor-pointer transition-all duration-300"
+                            style={{
+                              filter: isSelected ? `drop-shadow(0px 0px 6px ${segment.color})` : 'none',
+                              opacity: (selectedSlice !== 'all' && !isSelected && !isHovered) ? 0.45 : 1
+                            }}
+                          />
+                        );
+                      })}
+                    </svg>
+                  ) : (
+                    /* SOLID PIE CHART */
+                    <svg viewBox="0 0 200 200" className="w-full h-full">
+                      {pieAndDonutSegments.map((segment) => {
+                        const isHovered = hoveredSlice === segment.id;
+                        const isSelected = selectedSlice === segment.id;
+
+                        return (
+                          <path
+                            key={segment.id}
+                            d={segment.piePath}
+                            fill={segment.color}
+                            stroke="#FFFFFF"
+                            strokeWidth={isSelected ? '3' : '2'}
+                            onClick={() => setSelectedSlice(selectedSlice === segment.id ? 'all' : segment.id)}
+                            onMouseEnter={() => setHoveredSlice(segment.id)}
+                            onMouseLeave={() => setHoveredSlice(null)}
+                            className="cursor-pointer transition-all duration-300 hover:brightness-110"
+                            style={{
+                              transformOrigin: '100px 100px',
+                              transform: (isHovered || isSelected) ? 'scale(1.05)' : 'scale(1)',
+                              opacity: (selectedSlice !== 'all' && !isSelected && !isHovered) ? 0.45 : 1
+                            }}
+                          />
+                        );
+                      })}
+                    </svg>
+                  )}
+
+                  {/* Donut Center Label (Visible in Donut mode) */}
+                  {pieChartStyle === 'donut' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {pieMetric === 'volume' ? 'Total Volume' : 'Total Revenue'}
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-900 mt-0.5">
+                        {pieMetric === 'volume' ? `${totalCategoryVolume}p` : `₹${(totalCategoryRevenue / 1000).toFixed(1)}k`}
+                      </span>
+                      <span className="text-[9px] text-emerald-700 font-bold mt-1 px-2 py-0.2 rounded-full bg-emerald-50 border border-emerald-200">
+                        100% Demand
+                      </span>
+                    </div>
+                  )}
+
+                </div>
+
+                <div className="flex items-center space-x-2 mt-2">
+                  <button
+                    onClick={() => setSelectedSlice('all')}
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border transition ${
+                      selectedSlice === 'all' 
+                        ? 'bg-slate-900 text-white border-slate-900' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+                    }`}
+                  >
+                    View All Categories
+                  </button>
+                  {selectedSlice !== 'all' && (
+                    <span className="text-[11px] font-bold text-orange-600">
+                      Filtering: {categoryStats.find(c => c.id === selectedSlice)?.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Category Breakdown Cards on Right of Pie */}
+              <div className="sm:col-span-6 space-y-2">
+                {pieAndDonutSegments.map((cat, idx) => {
+                  const isSelected = selectedSlice === cat.id;
+
+                  return (
+                    <div
+                      key={cat.id}
+                      onClick={() => setSelectedSlice(selectedSlice === cat.id ? 'all' : cat.id)}
+                      className={`p-2.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-2 ${
+                        isSelected 
+                          ? 'bg-orange-50/80 border-orange-300 ring-2 ring-orange-400/20' 
+                          : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200/70'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                        <div 
+                          className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" 
+                          style={{ backgroundColor: cat.color }} 
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-900 truncate">
+                              {cat.name}
+                            </span>
+                            <span className="font-mono font-black text-slate-800 text-[11px]">
+                              {pieMetric === 'volume' ? `${cat.volume}p` : `₹${cat.revenue.toLocaleString()}`}
+                            </span>
+                          </div>
+                          
+                          {/* Mini Progress Bar */}
+                          <div className="w-full h-1.5 rounded-full bg-slate-200 mt-1 overflow-hidden">
+                            <div 
+                              style={{ width: `${cat.share}%`, backgroundColor: cat.color }} 
+                              className="h-full rounded-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] font-mono font-bold text-slate-500 shrink-0">
+                        {cat.share}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* RIGHT / SALES VELOCITY (6 COLS): DUAL-METRIC SALES VELOCITY WAVE */}
+        {dashboardConfig.showSalesWave && (
+          <div className="lg:col-span-6 p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm space-y-4 transition-all">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Activity className="w-5 h-5 text-orange-500" />
+                  <h2 className="text-base font-black font-heading text-slate-900">
+                    {currentDataset.title}
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  {currentDataset.subtitle}
+                </p>
+              </div>
+
+              {/* Timeframe & Metric Toggle */}
+              <div className="flex items-center space-x-1.5">
+                <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                  <button
+                    onClick={() => setChartMetric('revenue')}
+                    className={`px-2 py-1 rounded-xl transition ${chartMetric === 'revenue' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    ₹
+                  </button>
+                  <button
+                    onClick={() => setChartMetric('volume')}
+                    className={`px-2 py-1 rounded-xl transition ${chartMetric === 'volume' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    📦
+                  </button>
+                </div>
+
+                <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                  <button
+                    onClick={() => { setTimeframe('hourly'); setSelectedPointIndex(5); }}
+                    className={`px-2.5 py-1 rounded-xl transition ${timeframe === 'hourly' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => { setTimeframe('weekly'); setSelectedPointIndex(5); }}
+                    className={`px-2.5 py-1 rounded-xl transition ${timeframe === 'weekly' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    Week
+                  </button>
+                  <button
+                    onClick={() => { setTimeframe('monthly'); setSelectedPointIndex(3); }}
+                    className={`px-2.5 py-1 rounded-xl transition ${timeframe === 'monthly' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    Month
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Milestone Card */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50/50 to-white border border-orange-200/60 flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-black text-xs shadow-xs font-mono">
+                  {activePoint.label}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-black text-sm font-mono text-slate-900">
+                      {chartMetric === 'revenue' 
+                        ? `₹${activePoint.revenue.toLocaleString('en-IN')}` 
+                        : `${activePoint.volume || activePoint.orders * 2} Plates`}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 font-bold text-[10px] border border-orange-200">
+                      {activePoint.status}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {activePoint.orders} tickets • Top Dish: <strong className="text-orange-700">{activePoint.peakDish}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-xl bg-white border border-slate-200 font-mono font-bold text-[11px] text-slate-700 shadow-xs">
+                ⚡ Turn: 18m
+              </span>
+            </div>
+
+            {/* Precision SVG Canvas & Pillars */}
+            <div className="pt-2 relative">
+              
+              {/* Spline Wave SVG Line */}
+              <div className="w-full h-24 mb-2">
+                <svg viewBox="0 0 1000 200" className="w-full h-full overflow-visible">
+                  <defs>
+                    <linearGradient id="whiteWaveGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#EA580C" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#EA580C" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {areaPath && (
+                    <path d={areaPath} fill="url(#whiteWaveGrad)" />
+                  )}
+                  {splinePath && (
+                    <path 
+                      d={splinePath} 
+                      fill="none" 
+                      stroke="#EA580C" 
+                      strokeWidth="3.5" 
+                      strokeLinecap="round" 
+                    />
+                  )}
+                  {svgCoords.map((coord, idx) => (
+                    <circle
+                      key={idx}
+                      cx={coord.x}
+                      cy={coord.y}
+                      r={idx === activePointIndex ? 6 : 4}
+                      fill={idx === activePointIndex ? '#EA580C' : '#FFFFFF'}
+                      stroke="#EA580C"
+                      strokeWidth="2.5"
+                    />
+                  ))}
+                </svg>
+              </div>
+
+              {/* Slender Data Columns */}
+              <div className="grid grid-cols-7 gap-2 items-end pt-1">
+                {currentDataset.points.map((pt, index) => {
+                  const val = chartMetric === 'revenue' ? pt.revenue : (pt.volume || pt.orders * 2.2);
+                  const max = chartMetric === 'revenue' ? maxRevenue : maxVolume;
+                  const heightPct = Math.max(16, Math.min(100, Math.round((val / max) * 100)));
+                  const isSelected = index === activePointIndex;
+
+                  return (
+                    <div 
+                      key={index}
+                      onClick={() => setSelectedPointIndex(index)}
+                      className="flex flex-col items-center justify-end h-full group cursor-pointer"
+                    >
+                      <div className={`mb-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition shadow-2xs ${
+                        isSelected ? 'bg-orange-600 text-white scale-105' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>
+                        {chartMetric === 'revenue' 
+                          ? (pt.revenue >= 1000 ? `₹${(pt.revenue / 1000).toFixed(1)}k` : `₹${pt.revenue}`)
+                          : `${pt.volume || pt.orders * 2}p`}
+                      </div>
+
+                      <div className="w-full max-w-[34px] h-28 bg-slate-100 rounded-xl p-1 flex flex-col justify-end items-center border border-slate-200/80">
+                        <div 
+                          style={{ height: `${heightPct}%` }}
+                          className={`w-full rounded-lg transition-all duration-300 ${
+                            isSelected 
+                              ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-xs' 
+                              : 'bg-slate-300 group-hover:bg-orange-400'
+                          }`}
+                        />
+                      </div>
+
+                      <span className={`text-[11px] font-bold mt-1.5 ${isSelected ? 'text-orange-600' : 'text-slate-500'}`}>
+                        {pt.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* 4. "CHECKS THE ITEMS IN ONE PLACE" — ALL-IN-ONE MENU ITEM COMMAND CENTER & QUICK-EDITOR */}
+      {dashboardConfig.showItemCommandCenter && (
+        <div className="p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm space-y-5 transition-all">
+          
+          {/* Header & Controls Bar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Trophy className="w-5 h-5 text-orange-500" />
+                <h2 className="text-base sm:text-lg font-black font-heading text-slate-900">
+                  Menu Items Demand & Live Control Center ({filteredDishes.length} Items)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Check and customize dish demand, volume sold, live stock availability, and edit prices right in one place
+              </p>
+            </div>
+
+            {/* Sub-Filters: All, Bestsellers, Dead Stock */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+                <button
+                  onClick={() => setDemandTab('all')}
+                  className={`px-3 py-1.5 rounded-xl transition ${demandTab === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  All Menu Items ({itemsList.length})
+                </button>
+                <button
+                  onClick={() => setDemandTab('bestsellers')}
+                  className={`px-3 py-1.5 rounded-xl transition ${demandTab === 'bestsellers' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  🔥 Bestsellers
+                </button>
+                <button
+                  onClick={() => setDemandTab('low_demand')}
+                  className={`px-3 py-1.5 rounded-xl transition ${demandTab === 'low_demand' ? 'bg-rose-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  ⚠️ Dead Stock / Low Demand
+                </button>
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSlice('all'); }}
+                className="px-3 py-2 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer focus:outline-none"
+              >
+                <option value="all">All Categories</option>
+                <option value="mysore">Mysore Dosa</option>
+                <option value="fancy">Fancy Dosa</option>
+                <option value="pav bhaji">Pav Bhaji & Pulao</option>
+                <option value="plain paper">Plain Paper Dosa</option>
+                <option value="chinese">Chinese & Starters</option>
+              </select>
+
+              {/* Sort By Dropdown */}
+              <select
+                value={dishSortBy}
+                onChange={(e) => setDishSortBy(e.target.value)}
+                className="px-3 py-2 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer focus:outline-none"
+              >
+                <option value="volume">Sort by: Quantity Volume (Plates)</option>
+                <option value="revenue">Sort by: Revenue (₹)</option>
+                <option value="margin">Sort by: Profit Margin %</option>
+                <option value="price">Sort by: Selling Price (₹)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Search Bar & Active Slice Indicator */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Search dish by English name, Gujarati (માયસોર, બાહુબલી) or category..."
+                value={dishSearch}
+                onChange={(e) => setDishSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              />
+            </div>
+
+            {selectedSlice !== 'all' && (
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="font-bold text-slate-500">Filtered by Pie Slice:</span>
+                <span className="px-2.5 py-1 rounded-xl bg-orange-100 text-orange-800 font-bold border border-orange-200 flex items-center space-x-1.5">
+                  <span>{categoryStats.find(c => c.id === selectedSlice)?.name}</span>
+                  <button onClick={() => setSelectedSlice('all')} className="hover:text-red-600">×</button>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* THE ALL-IN-ONE DATA & ACTION TABLE */}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="py-3 px-4">Rank & Dish Details</th>
+                  <th className="py-3 px-4">Demand Velocity</th>
+                  <th className="py-3 px-4">Live Availability</th>
+                  <th className="py-3 px-4">Selling Price (Editable)</th>
+                  <th className="py-3 px-4">Volume (Plates Sold)</th>
+                  <th className="py-3 px-4">Total Revenue</th>
+                  <th className="py-3 px-4">Margin %</th>
+                  <th className="py-3 px-4">AI Turnaround Tip</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {filteredDishes.map((dish) => {
+                  const volumePct = Math.round((dish.volumeQty / maxDishVolume) * 100);
+                  const isEditingThisPrice = editingItemId === dish.id;
+
+                  return (
+                    <tr key={dish.id} className="hover:bg-slate-50/70 transition">
+                      
+                      {/* 1. Rank & Identity */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-3">
+                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-black text-xs shrink-0 ${
+                            dish.rank === 1 ? 'bg-amber-100 text-amber-800 font-black' : (dish.rank <= 3 ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600')
+                          }`}>
+                            #{dish.rank}
+                          </span>
+                          <div>
+                            <span className="font-bold text-slate-900 block text-xs">
+                              {dish.name}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-500 block">
+                              {dish.guj}
+                            </span>
+                            <span className="text-[10px] font-bold text-orange-600 mt-0.5 inline-block">
+                              {dish.category}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Demand Velocity Badge */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          dish.velocityType === 'super'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : (dish.velocityType === 'hot' || dish.velocityType === 'fast'
+                              ? 'bg-orange-50 text-orange-800 border-orange-200'
+                              : (dish.velocityType === 'low'
+                                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'))
+                        }`}>
+                          {dish.velocity}
+                        </span>
+                      </td>
+
+                      {/* 3. Live Stock Availability Toggle Switch */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggleItemAvailability(dish.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer border ${
+                            dish.isAvailable
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                          }`}
+                          title="Click to toggle In Stock vs Sold Out in real-time"
+                        >
+                          <span className={`w-2 h-2 rounded-full ${dish.isAvailable ? 'bg-emerald-600' : 'bg-rose-600'}`}></span>
+                          <span>{dish.isAvailable ? 'In Stock 🟢' : 'Sold Out 🔴'}</span>
+                        </button>
+                      </td>
+
+                      {/* 4. Inline Price Editor */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isEditingThisPrice ? (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-500 font-bold">₹</span>
+                            <input
+                              type="number"
+                              value={editingPriceVal}
+                              onChange={(e) => setEditingPriceVal(e.target.value)}
+                              className="w-16 px-1.5 py-0.5 text-xs font-mono font-bold border border-orange-300 rounded focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveItemPrice(dish.id)}
+                              className="p-1 rounded bg-orange-600 hover:bg-orange-700 text-white"
+                              title="Save Price"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setEditingItemId(null)}
+                              className="p-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div 
+                            onClick={() => { setEditingItemId(dish.id); setEditingPriceVal(dish.price); }}
+                            className="flex items-center space-x-1.5 group cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-lg transition"
+                            title="Click to edit item price"
+                          >
+                            <span className="font-mono font-black text-slate-900 text-xs">
+                              ₹{dish.price}
+                            </span>
+                            <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 5. Volume Sold */}
+                      <td className="py-3.5 px-4 min-w-[130px]">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-mono font-black text-slate-900">{dish.volumeQty} Plates</span>
+                            <span className="font-mono text-[10px] text-slate-400">{volumePct}%</span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div 
+                              style={{ width: `${volumePct}%` }} 
+                              className={`h-full rounded-full ${dish.rank <= 3 ? 'bg-orange-500' : 'bg-slate-400'}`}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 6. Total Gross Revenue */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-mono font-black text-slate-900">
+                        ₹{dish.revenue.toLocaleString()}
+                      </td>
+
+                      {/* 7. Margin % */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] ${
+                          parseInt(dish.margin) >= 65 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {dish.margin}
+                        </span>
+                      </td>
+
+                      {/* 8. AI Strategy Tip */}
+                      <td className="py-3.5 px-4 min-w-[200px] text-[11px] text-slate-600">
+                        {dish.recommendation}
+                      </td>
+
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      )}
+
+      {/* 5. ACTIVE TABLE SESSIONS & COD VS ONLINE RECONCILIATION */}
+      {dashboardConfig.showLiveTables && (
+        <div className="p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm space-y-5 transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <h2 className="text-base sm:text-lg font-black font-heading text-slate-900">
+                  Live Table Sessions & Bill Settlement ({displaySessions.filter(s => s.status === 'ACTIVE').length} Tables Seated)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Clear distinction between online paid and COD (Cash on Table). Includes 30-min auto-vacate calculation and 1-click vacate.
+              </p>
+            </div>
+
+            <button
               onClick={fetchLiveSupabaseData}
-              className={`px-3 py-1.5 rounded-xl border ${isDark ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700' : 'bg-white hover:bg-slate-100 text-zinc-900 border-zinc-300'} font-bold text-[11px] transition cursor-pointer flex items-center space-x-1`}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3 text-orange-400" />
-              <span>Sync Live DB</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh Live Supabase Tables</span>
             </button>
           </div>
 
-          {/* Table Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displaySessions.map((sess) => {
-              const tableNum = sess.restaurant_tables?.table_number || sess.table_number || 'T-01';
-              const isPaid = sess.payment_status === 'PAID';
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {displaySessions.filter(s => s.status === 'ACTIVE').map(session => {
+              const elapsedMinutes = Math.round((Date.now() - new Date(session.opened_at).getTime()) / 60000);
+              const isOvertime = elapsedMinutes > 30;
+              const isOnlinePaid = session.payment_status === 'PAID';
 
               return (
                 <div 
-                  key={sess.id} 
-                  className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg flex flex-col justify-between hover:border-slate-700 transition-all`}
+                  key={session.id}
+                  className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                    isOvertime 
+                      ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/20' 
+                      : 'bg-slate-50/80 border-slate-200'
+                  }`}
                 >
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="px-3 py-1 rounded-xl bg-orange-500 text-slate-950 font-black text-sm">
-                          {tableNum}
-                        </span>
-                        <span className="text-[11px] font-mono font-bold text-slate-500">
-                          {sess.session_code || 'SESS-LIVE'}
-                        </span>
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        isPaid 
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {isPaid ? 'PAID (Online Gateway)' : 'UNPAID (Cash On Table)'}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-8 h-8 rounded-xl bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center">
+                        {session.table_number || 'T01'}
                       </span>
-                    </div>
-
-                    {/* Customer Info */}
-                    <div className="mt-3.5 pt-3 border-t border-slate-800">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-100">{sess.customer_name || 'Walk-in Guest'}</span>
-                        <span className="text-slate-400 font-mono text-[11px]">{sess.customer_phone || 'No phone'}</span>
+                      <div>
+                        <h4 className="font-black text-xs text-slate-900">{session.customer_name || 'Guest'}</h4>
+                        <span className="text-[10px] text-slate-500 font-mono">{session.customer_phone || ''}</span>
                       </div>
                     </div>
 
-                    {/* Order summary */}
-                    <div className={`mt-3 p-3 rounded-2xl ${palette.innerBox} text-xs text-slate-300 font-medium`}>
-                      {sess.items_summary || '1x Mysore Masala Dosa, 1x Amul Butter Pav Bhaji'}
-                    </div>
+                    {/* Online vs COD Badge */}
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      isOnlinePaid 
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                        : 'bg-orange-100 text-orange-800 border-orange-300'
+                    }`}>
+                      {isOnlinePaid ? 'Online Paid (UPI) 🟢' : 'COD (Cash Due) 🟠'}
+                    </span>
+                  </div>
 
-                    {/* Bill amount */}
-                    <div className="mt-3.5 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Current Bill</span>
-                      <span className="text-xl font-black font-mono text-emerald-400">
-                        ₹{(sess.total_amount || 210).toFixed(2)}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Order Items:</span>
+                      <strong className="text-slate-800 font-medium truncate max-w-[170px]">{session.items_summary || 'Mysore Masala + Chaas'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Elapsed Time:</span>
+                      <span className={`font-mono font-bold ${isOvertime ? 'text-amber-700' : 'text-slate-700'}`}>
+                        {elapsedMinutes} mins {isOvertime && '(Eligible for Auto-Vacate)'}
                       </span>
+                    </div>
+                    <div className="flex justify-between font-black text-sm pt-1 border-t border-slate-100">
+                      <span>Total Bill:</span>
+                      <span className="font-mono text-orange-600">₹{session.total_amount}</span>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 pt-1">
                     <button
-                      onClick={() => setSelectedReceiptOrder({
-                        order_number: sess.session_code,
-                        table_number: tableNum,
-                        customer_name: sess.customer_name,
-                        customer_phone: sess.customer_phone,
-                        total_amount: sess.total_amount || 210,
-                        placed_at: sess.opened_at,
-                        payment_method: sess.payment_method || 'CASH',
-                        payment_status: sess.payment_status || 'UNPAID',
-                        items_summary: sess.items_summary || 'Mysore Masala Dosa + Pav Bhaji'
-                      })}
-                      className={`flex-1 py-2.5 rounded-xl border ${isDark ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-zinc-800'} text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer`}
+                      onClick={() => handleSettleSession(session)}
+                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-1 shadow-xs cursor-pointer"
                     >
-                      <Receipt className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Receipt</span>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Vacate & Settle</span>
                     </button>
 
                     <button
-                      onClick={() => handleSettleSession(sess)}
-                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-xs cursor-pointer"
+                      onClick={() => setSelectedReceiptOrder({
+                        order_number: session.session_code,
+                        table_number: session.table_number,
+                        customer_name: session.customer_name,
+                        customer_phone: session.customer_phone,
+                        items_summary: session.items_summary,
+                        total_amount: session.total_amount,
+                        payment_method: session.payment_method,
+                        payment_status: session.payment_status,
+                        placed_at: session.opened_at
+                      })}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer"
+                      title="Download or Print Receipt"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Settle & Vacate</span>
+                      <Printer className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1672,107 +1822,209 @@ export default function ExecutiveDashboard({
         </div>
       )}
 
-      {/* TAB 5: CUSTOMER CRM & VIP DIRECTORY */}
-      {activeTab === 'crm' && (
-        <div className="space-y-4">
-          <div className={`p-4 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
-            <div>
-              <h3 className="text-sm font-black font-heading">Guest Directory & Lifetime Spend CRM</h3>
-              <p className={`text-xs ${palette.textSecondary} font-medium`}>
-                Ground-truth customer profiles with visit counts, favorite dishes, and 1-tap WhatsApp promo links
-              </p>
+      {/* 6. PEAK DINING RUSH HEATMAP */}
+      {dashboardConfig.showRushHeatmap && (
+        <div className="p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 shadow-xs hover:shadow-sm space-y-4 transition-all">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-5 h-5 text-orange-500" />
+              <h2 className="text-base font-black font-heading text-slate-900">
+                Hourly Kitchen Prep & Tawa Staffing Heatmap
+              </h2>
             </div>
-
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search by guest name or phone..."
-                value={crmSearch}
-                onChange={(e) => setCrmSearch(e.target.value)}
-                className={`pl-9 pr-3 py-1.5 rounded-xl ${isDark ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-100 border-slate-200 text-zinc-900'} border text-xs font-medium focus:outline-none focus:ring-1 focus:ring-orange-500`}
-              />
-            </div>
+            <span className="text-xs font-bold text-slate-500">
+              Kitchen Turnaround: 11m Average
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {crmGuests.map((guest) => (
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {rushHours.map((slot, i) => (
               <div 
-                key={guest.id}
-                className={`p-5 rounded-3xl ${palette.cardBg} border ${palette.cardBorder} shadow-lg space-y-3 hover:border-slate-700 transition`}
+                key={i}
+                className={`p-4 rounded-2xl border transition ${
+                  slot.rush === 'HOUSEFULL' 
+                    ? 'bg-orange-50/80 border-orange-300 ring-2 ring-orange-400/20' 
+                    : 'bg-slate-50 border-slate-200'
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-black text-sm">{guest.name}</h4>
-                    <span className="text-xs text-slate-400 font-mono">{guest.phone}</span>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    guest.tier.includes('Platinum') 
-                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
-                      : guest.tier.includes('Gold') 
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                      : 'bg-slate-800 text-slate-400'
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
+                  {slot.hour}
+                </span>
+                <h4 className="font-black text-sm text-slate-900 mt-1">
+                  {slot.session}
+                </h4>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="font-mono font-bold text-slate-700">{slot.plates} Plates</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    slot.rush === 'HOUSEFULL' ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-800'
                   }`}>
-                    {guest.tier}
+                    {slot.rush}
                   </span>
                 </div>
-
-                <div className={`p-3 rounded-2xl ${palette.innerBox} space-y-1.5 text-xs`}>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Visits:</span>
-                    <strong className="text-slate-200 font-mono">{guest.visits} times</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Lifetime Spend:</span>
-                    <strong className="text-emerald-400 font-mono font-black">₹{guest.total_spent}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Favorite:</span>
-                    <strong className="text-amber-400 truncate max-w-[150px]">{guest.favorite}</strong>
-                  </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-200 mt-2 overflow-hidden">
+                  <div 
+                    style={{ width: slot.load }} 
+                    className={`h-full rounded-full ${slot.rush === 'HOUSEFULL' ? 'bg-orange-500' : 'bg-slate-400'}`}
+                  />
                 </div>
-
-                <div className="pt-1 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-500">Last visit: {guest.last_visit}</span>
-                  <a
-                    href={`https://wa.me/${guest.phone.replace(/[^0-9]/g, '')}?text=Namaste%20${encodeURIComponent(guest.name)}%2C%20Atmiya%20Dosa%20Hub%20welcomes%20you%20back%20with%20a%20special%20festive%20treat%20today!`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 font-bold transition flex items-center space-x-1"
-                  >
-                    <Phone className="w-3 h-3" />
-                    <span>WhatsApp</span>
-                  </a>
-                </div>
+                <p className="text-[10px] text-slate-500 mt-2 leading-tight">
+                  {slot.tip}
+                </p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* 5. PRINTABLE TAX INVOICE & THERMAL RECEIPT MODAL */}
+      {/* 7. DASHBOARD CUSTOMIZE MODAL / DRAWER */}
+      {showCustomizeModal && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 p-6 space-y-5 animate-in fade-in zoom-in-95">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <SlidersHorizontal className="w-5 h-5 text-orange-600" />
+                <h3 className="text-base font-black font-heading text-slate-900">
+                  Customize Executive Dashboard
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowCustomizeModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Customization Options */}
+            <div className="space-y-4 text-xs">
+              
+              {/* Daily Sales Target Goal Setting */}
+              <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-200/80 space-y-2">
+                <span className="font-bold text-slate-900 block">Daily Target Sales Goal (₹)</span>
+                <p className="text-[11px] text-slate-600">Set your restaurant's daily sales milestone. The progress bar updates in real time.</p>
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="font-bold text-sm text-slate-800">₹</span>
+                  <input
+                    type="number"
+                    value={targetInputVal}
+                    onChange={(e) => setTargetInputVal(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-orange-300 bg-white text-xs font-mono font-bold focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveDailyTarget}
+                    className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs"
+                  >
+                    Save Target
+                  </button>
+                </div>
+              </div>
+
+              {/* Toggle Sections Visibility */}
+              <div className="space-y-2">
+                <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider text-slate-400">
+                  Visible Dashboard Sections
+                </span>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">1. Executive KPI Cards & Daily Goal</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showKpis}
+                    onChange={(e) => updateConfig('showKpis', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">2. Interactive Category Pie / Donut Chart</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showPieChart}
+                    onChange={(e) => updateConfig('showPieChart', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">3. Sales Velocity & Order Volume Spline Wave</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showSalesWave}
+                    onChange={(e) => updateConfig('showSalesWave', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">4. Menu Items Demand & Live Control Table</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showItemCommandCenter}
+                    onChange={(e) => updateConfig('showItemCommandCenter', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">5. Live Table Sessions & Bill Settlement</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showLiveTables}
+                    onChange={(e) => updateConfig('showLiveTables', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-slate-100">
+                  <span className="font-medium text-slate-800">6. Hourly Kitchen Prep & Staffing Heatmap</span>
+                  <input
+                    type="checkbox"
+                    checked={dashboardConfig.showRushHeatmap}
+                    onChange={(e) => updateConfig('showRushHeatmap', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setShowCustomizeModal(false)}
+                className="px-5 py-2.5 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 8. PRINTABLE TAX INVOICE & THERMAL RECEIPT MODAL */}
       {selectedReceiptOrder && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`rounded-3xl max-w-md w-full shadow-2xl border p-6 space-y-4 relative animate-in fade-in zoom-in-95 ${isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 bg-white p-6 space-y-4 relative animate-in fade-in zoom-in-95 text-slate-900">
             
             <button
               onClick={() => setSelectedReceiptOrder(null)}
-              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 absolute top-4 right-4 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 absolute top-4 right-4 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             {/* Receipt Body */}
-            <div id="printable-receipt" className="p-5 rounded-2xl bg-white border border-zinc-200 font-mono text-xs space-y-3 text-zinc-900">
+            <div id="printable-receipt" className="p-5 rounded-2xl bg-white border border-slate-200 font-mono text-xs space-y-3 text-slate-900">
               <div className="text-center space-y-1">
-                <h4 className="font-black text-base uppercase tracking-tight text-zinc-900">
+                <h4 className="font-black text-base uppercase tracking-tight text-slate-900">
                   ATMIYA DOSA HUB
                 </h4>
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[10px] text-slate-500">
                   Opp. New Bus Station, Station Road, Petlad, Anand, Gujarat - 388450
                 </p>
-                <p className="text-[10px] text-zinc-500">GSTIN: 24AAACA1234A1Z5 • Phone: +91 98765 43210</p>
-                <div className="border-b border-dashed border-zinc-300 pt-2"></div>
+                <p className="text-[10px] text-slate-500">GSTIN: 24AAACA1234A1Z5 • Phone: +91 98765 43210</p>
+                <div className="border-b border-dashed border-slate-300 pt-2"></div>
               </div>
 
               <div className="flex justify-between text-[11px]">
@@ -1783,11 +2035,11 @@ export default function ExecutiveDashboard({
                 <span>Guest: {selectedReceiptOrder.customer_name || 'Walk-in'}</span>
                 <span>{selectedReceiptOrder.customer_phone || ''}</span>
               </div>
-              <div className="text-[10px] text-zinc-400">
+              <div className="text-[10px] text-slate-400">
                 Date: {new Date(selectedReceiptOrder.placed_at || Date.now()).toLocaleString()}
               </div>
 
-              <div className="border-b border-dashed border-zinc-300"></div>
+              <div className="border-b border-dashed border-slate-300"></div>
 
               {/* Items */}
               <div className="space-y-1 text-[11px]">
@@ -1795,13 +2047,13 @@ export default function ExecutiveDashboard({
                   <span>Item</span>
                   <span>Amount</span>
                 </div>
-                <div className="flex justify-between text-zinc-700">
+                <div className="flex justify-between text-slate-700">
                   <span>{selectedReceiptOrder.items_summary || 'Mysore Masala Dosa + Pav Bhaji'}</span>
                   <span>₹{selectedReceiptOrder.total_amount}</span>
                 </div>
               </div>
 
-              <div className="border-b border-dashed border-zinc-300"></div>
+              <div className="border-b border-dashed border-slate-300"></div>
 
               {/* Calculations */}
               <div className="space-y-1 text-[11px]">
@@ -1809,19 +2061,19 @@ export default function ExecutiveDashboard({
                   <span>Subtotal:</span>
                   <span>₹{(selectedReceiptOrder.total_amount * 0.952).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-[10px] text-zinc-500">
+                <div className="flex justify-between text-[10px] text-slate-500">
                   <span>GST (5% Included):</span>
                   <span>₹{(selectedReceiptOrder.total_amount * 0.048).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between font-black text-sm pt-1 border-t border-zinc-300">
+                <div className="flex justify-between font-black text-sm pt-1 border-t border-slate-300 text-slate-900">
                   <span>NET TOTAL:</span>
                   <span>₹{selectedReceiptOrder.total_amount.toFixed(2)}</span>
                 </div>
               </div>
 
-              <div className="border-b border-dashed border-zinc-300"></div>
+              <div className="border-b border-dashed border-slate-300"></div>
 
-              <div className="text-center text-[10px] text-zinc-500">
+              <div className="text-center text-[10px] text-slate-500">
                 Payment: {selectedReceiptOrder.payment_method} ({selectedReceiptOrder.payment_status})
                 <br />
                 Thank you for dining with Atmiya Dosa Hub! Visit again.
@@ -1842,7 +2094,7 @@ export default function ExecutiveDashboard({
                   alert('Tax Invoice downloaded to receipts folder.');
                   setSelectedReceiptOrder(null);
                 }}
-                className={`py-2.5 px-4 rounded-xl border ${isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-zinc-700 border-zinc-200'} font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer`}
+                className="py-2.5 px-4 rounded-xl border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Download</span>

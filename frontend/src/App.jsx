@@ -78,7 +78,10 @@ export default function App() {
   // Global State (persisted & synchronized)
   const [settings, setSettings] = useState(() => getLocalStore('settings', INITIAL_SETTINGS));
   const [currentLang, setCurrentLang] = useState(settings?.language || 'en');
-  const [theme, setThemeState] = useState(() => getLocalStore('app_theme', 'obsidian'));
+  const [theme, setThemeState] = useState(() => {
+    const saved = getLocalStore('app_theme', 'light');
+    return (saved === 'obsidian' || !saved) ? 'light' : saved;
+  });
   const setTheme = (newTheme) => {
     setThemeState(newTheme);
     setLocalStore('app_theme', newTheme);
@@ -690,7 +693,7 @@ export default function App() {
 
   const navActiveStyle = theme === 'sapphire'
     ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
-    : (theme === 'light' ? 'bg-zinc-900 text-white font-bold shadow-xs' : 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/25');
+    : (theme === 'light' ? 'bg-orange-500 text-white font-bold shadow-sm shadow-orange-500/25' : 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/25');
 
   const navInactiveStyle = isDark
     ? 'text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium'
@@ -875,7 +878,11 @@ export default function App() {
         <div className="p-4 space-y-3">
           
           {/* Food Graphic Banner */}
-          <div className="rounded-2xl p-3 bg-slate-800/80 border border-slate-700/60 relative overflow-hidden">
+          <div className={`rounded-2xl p-3 border relative overflow-hidden ${
+            isDark 
+              ? 'bg-slate-800/80 border-slate-700/60' 
+              : 'bg-gradient-to-br from-orange-50 to-amber-50/60 border-orange-200/60'
+          }`}>
             <div className="flex items-center space-x-3">
               <img 
                 src="https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=120&q=80" 
@@ -883,17 +890,19 @@ export default function App() {
                 className="w-12 h-12 rounded-xl object-cover shrink-0" 
               />
               <div>
-                <p className="text-[11px] font-black text-white font-heading leading-tight">
+                <p className={`text-[11px] font-black font-heading leading-tight ${
+                  isDark ? 'text-white' : 'text-slate-900'
+                }`}>
                   {t('goodFoodHappyPeople')}
                 </p>
-                <span className="text-[9px] font-bold text-orange-400">Pure Veg Authentic</span>
+                <span className="text-[9px] font-bold text-orange-600">Pure Veg Authentic</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1">
             <span>Version 2.0.0</span>
-            <span className="text-emerald-400 font-bold">Supabase Cloud 🟢</span>
+            <span className="text-emerald-500 font-bold">Supabase Cloud 🟢</span>
           </div>
 
         </div>
