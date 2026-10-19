@@ -78,6 +78,11 @@ export default function App() {
   // Global State (persisted & synchronized)
   const [settings, setSettings] = useState(() => getLocalStore('settings', INITIAL_SETTINGS));
   const [currentLang, setCurrentLang] = useState(settings?.language || 'en');
+  const [theme, setThemeState] = useState(() => getLocalStore('app_theme', 'obsidian'));
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme);
+    setLocalStore('app_theme', newTheme);
+  };
   const [tables, setTables] = useState(() => getLocalStore('tables', INITIAL_TABLES));
   const [categories, setCategories] = useState(() => getLocalStore('categories', INITIAL_CATEGORIES));
   const [menuItems, setMenuItems] = useState(() => getLocalStore('menu_items', INITIAL_MENU_ITEMS));
@@ -670,28 +675,49 @@ export default function App() {
     );
   }
 
-  // AUTHENTICATED ADMIN DASHBOARD (MATCHING THE REFERENCE SCREENSHOT)
+  const isDark = theme !== 'light';
+  const appBgClass = theme === 'sapphire' 
+    ? 'bg-[#060B18] text-slate-100' 
+    : (theme === 'light' ? 'bg-[#F8FAFC] text-zinc-900' : 'bg-[#090D16] text-slate-100');
+  
+  const sidebarClass = theme === 'sapphire'
+    ? 'bg-[#0B1530]/95 border-indigo-900/50 text-slate-300'
+    : (theme === 'light' ? 'bg-white/95 border-zinc-200/80 text-zinc-700' : 'bg-[#0E1526]/95 border-slate-800 text-slate-300');
+
+  const headerClass = theme === 'sapphire'
+    ? 'bg-[#0B1530]/90 border-indigo-900/50 backdrop-blur-xl'
+    : (theme === 'light' ? 'bg-white/90 border-zinc-200/80 backdrop-blur-xl shadow-xs' : 'bg-[#0E1526]/90 border-slate-800/80 backdrop-blur-xl');
+
+  const navActiveStyle = theme === 'sapphire'
+    ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
+    : (theme === 'light' ? 'bg-zinc-900 text-white font-bold shadow-xs' : 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/25');
+
+  const navInactiveStyle = isDark
+    ? 'text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium'
+    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium';
+
   return (
-    <div className="min-h-screen bg-[#FBFBFC] font-sans flex text-zinc-900">
+    <div className={`min-h-screen font-sans flex transition-colors duration-300 ${appBgClass}`}>
       
-      {/* 1. ELEGANT LIGHT LUXURY SIDEBAR */}
+      {/* 1. ELEGANT SIDEBAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white/95 backdrop-blur-xl border-r border-zinc-200/80 text-zinc-700 flex flex-col justify-between transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 backdrop-blur-xl border-r flex flex-col justify-between transition-transform duration-300 ease-in-out
+        ${sidebarClass}
         ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Top Logo & Restaurant Title */}
         <div>
-          <div className="p-5 flex items-center justify-between border-b border-zinc-100">
+          <div className={`p-5 flex items-center justify-between border-b ${isDark ? 'border-slate-800/80' : 'border-zinc-100'}`}>
             <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center font-heading font-black shadow-md shadow-orange-500/20">
                 <Utensils className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-sm font-black text-zinc-900 font-heading tracking-tight leading-tight">
+                <h1 className="text-sm font-black font-heading tracking-tight leading-tight">
                   {settings?.restaurantName || 'Atmiya Dosa Hub'}
                 </h1>
-                <p className="text-[10px] font-bold text-zinc-400">
+                <p className="text-[10px] font-bold text-slate-400">
                   {t('adminPanel')} • Petlad
                 </p>
               </div>
@@ -700,7 +726,7 @@ export default function App() {
             {/* Close button on mobile */}
             <button 
               onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl bg-zinc-100 text-zinc-500 hover:text-zinc-900"
+              className={`lg:hidden p-1.5 rounded-xl ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-zinc-100 text-zinc-500 hover:text-zinc-900'}`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -713,9 +739,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('dashboard'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'dashboard' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'dashboard' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
@@ -726,9 +750,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('orders'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'orders' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'orders' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -744,9 +766,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('kitchen'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'kitchen' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'kitchen' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <ChefHat className="w-4 h-4" />
@@ -757,9 +777,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('tables'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'tables' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'tables' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <Utensils className="w-4 h-4" />
@@ -770,9 +788,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('menu'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'menu' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'menu' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <Utensils className="w-4 h-4" />
@@ -783,9 +799,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('inventory'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'inventory' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'inventory' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -803,9 +817,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('employees'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'employees' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'employees' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <Users className="w-4 h-4" />
@@ -816,9 +828,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('reports'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'reports' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'reports' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -829,9 +839,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('offers'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'offers' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'offers' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <Tag className="w-4 h-4" />
@@ -842,9 +850,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('qr'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'qr' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'qr' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <QrCode className="w-4 h-4" />
@@ -855,9 +861,7 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-black transition ${
-                activeTab === 'settings' 
-                  ? 'bg-zinc-900 text-white font-bold shadow-xs' 
-                  : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 font-medium'
+                activeTab === 'settings' ? navActiveStyle : navInactiveStyle
               }`}
             >
               <Settings className="w-4 h-4" />
@@ -908,14 +912,16 @@ export default function App() {
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
         
         {/* TOP HEADER BAR */}
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-200/80 shadow-sm px-4 sm:px-6 py-3.5">
+        <header className={`sticky top-0 z-30 border-b px-4 sm:px-6 py-3.5 transition-colors ${headerClass}`}>
           <div className="flex items-center justify-between gap-4">
             
             {/* Mobile Hamburger & Greeting */}
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700"
+                className={`lg:hidden p-2 rounded-xl transition ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
               >
                 <Menu className="w-5 h-5" />
               </button>
@@ -923,9 +929,9 @@ export default function App() {
               <div className="flex items-center space-x-2">
                 <Sun className="w-5 h-5 text-amber-500 shrink-0" />
                 <div>
-                  <div className="text-sm font-black text-slate-900 font-heading flex items-center space-x-1.5">
+                  <div className={`text-sm font-black font-heading flex items-center space-x-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     <span>{t('goodMorning')},</span>
-                    <span className="text-orange-600">{authUser?.name || 'Darshit Rana'}</span>
+                    <span className="text-orange-500">{authUser?.name || 'Darshit Rana'}</span>
                     <span>👑</span>
                   </div>
                   <div className="text-[10px] font-bold text-slate-400">
@@ -942,32 +948,84 @@ export default function App() {
                 <input
                   type="text"
                   placeholder={t('searchPlaceholder')}
-                  className="w-full pl-10 pr-4 py-2 rounded-2xl bg-slate-100 border-none text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  className={`w-full pl-10 pr-4 py-2 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition ${
+                    isDark 
+                      ? 'bg-slate-900/80 border border-slate-800 text-slate-100 placeholder-slate-500' 
+                      : 'bg-slate-100 border-none text-slate-900 placeholder-slate-400'
+                  }`}
                 />
               </div>
             </div>
 
-            {/* Right Controls: Live Clock, Language Dropdown, Notifications, User */}
+            {/* Right Controls: Theme Toggle, Live Clock, Language Dropdown, Notifications, User */}
             <div className="flex items-center space-x-2 sm:space-x-3">
+
+              {/* Theme Switcher Pill (Obsidian Luxe, Sapphire, Titanium Light) */}
+              <div className={`hidden md:flex items-center space-x-1 p-1 rounded-2xl border ${
+                isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-100 border-slate-200/80'
+              }`}>
+                <button
+                  onClick={() => setTheme('obsidian')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 ${
+                    theme === 'obsidian' 
+                      ? 'bg-orange-500 text-white shadow-xs' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Obsidian Cyber Luxe (Dark)"
+                >
+                  <span>🌙</span>
+                  <span className="hidden xl:inline">Obsidian</span>
+                </button>
+                <button
+                  onClick={() => setTheme('sapphire')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 ${
+                    theme === 'sapphire' 
+                      ? 'bg-indigo-600 text-white shadow-xs' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Deep Sapphire Blue"
+                >
+                  <span>💎</span>
+                  <span className="hidden xl:inline">Sapphire</span>
+                </button>
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 ${
+                    theme === 'light' 
+                      ? 'bg-white text-zinc-900 shadow-xs' 
+                      : 'text-slate-400 hover:text-slate-700'
+                  }`}
+                  title="Clean Titanium Light"
+                >
+                  <span>☀️</span>
+                  <span className="hidden xl:inline">Light</span>
+                </button>
+              </div>
               
               {/* Date & Time Badge */}
-              <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-2xl bg-slate-100 border border-slate-200/80 text-xs font-bold text-slate-700 font-mono">
+              <div className={`hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-2xl border text-xs font-bold font-mono ${
+                isDark ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200/80 text-slate-700'
+              }`}>
                 <Calendar className="w-3.5 h-3.5 text-orange-500" />
                 <span>{currentTimeStr}</span>
               </div>
 
               {/* 4-Language Dropdown Selector */}
-              <div className="flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl bg-slate-100 border border-slate-200/80 text-xs font-bold text-slate-700">
+              <div className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl border text-xs font-bold ${
+                isDark ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200/80 text-slate-700'
+              }`}>
                 <Globe className="w-3.5 h-3.5 text-orange-500" />
                 <select
                   value={currentLang}
                   onChange={(e) => setCurrentLang(e.target.value)}
-                  className="bg-transparent text-slate-800 font-bold focus:outline-none cursor-pointer text-xs"
+                  className={`bg-transparent font-bold focus:outline-none cursor-pointer text-xs ${
+                    isDark ? 'text-slate-200 bg-slate-900' : 'text-slate-800'
+                  }`}
                 >
-                  <option value="en">English</option>
-                  <option value="hi">हिन्दी</option>
-                  <option value="gu">ગુજરાતી</option>
-                  <option value="hinglish">Hinglish</option>
+                  <option value="en" className={isDark ? 'bg-slate-900 text-white' : ''}>English</option>
+                  <option value="hi" className={isDark ? 'bg-slate-900 text-white' : ''}>हिन्दी</option>
+                  <option value="gu" className={isDark ? 'bg-slate-900 text-white' : ''}>ગુજરાતી</option>
+                  <option value="hinglish" className={isDark ? 'bg-slate-900 text-white' : ''}>Hinglish</option>
                 </select>
               </div>
 
@@ -988,7 +1046,7 @@ export default function App() {
                   className={`p-2 rounded-2xl relative transition ${
                     serviceCalls.length > 0 
                       ? 'bg-orange-100 text-orange-700 animate-pulse' 
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : (isDark ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800' : 'bg-slate-100 hover:bg-slate-200 text-slate-700')
                   }`}
                   title="Table Service Requests (Waiter, Water, Bill)"
                 >
@@ -1001,28 +1059,32 @@ export default function App() {
                 </button>
 
                 {serviceDrawerOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-3xl p-4 shadow-2xl border border-slate-200 space-y-3 z-50">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className={`absolute right-0 mt-2 w-80 rounded-3xl p-4 shadow-2xl border space-y-3 z-50 ${
+                    isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+                  }`}>
+                    <div className="flex items-center justify-between border-b border-slate-800/40 pb-2">
                       <div className="flex items-center space-x-1.5">
                         <BellRing className="w-4 h-4 text-orange-500" />
-                        <span className="text-xs font-black text-slate-900 font-heading">Table Service Calls</span>
+                        <span className="text-xs font-black font-heading">Table Service Calls</span>
                       </div>
-                      <span className="text-[10px] font-bold text-orange-600 font-mono">
+                      <span className="text-[10px] font-bold text-orange-500 font-mono">
                         {serviceCalls.length} Pending
                       </span>
                     </div>
 
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {serviceCalls.map(call => (
-                        <div key={call.id} className="p-2.5 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between">
+                        <div key={call.id} className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                          isDark ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/70 border-orange-200'
+                        }`}>
                           <div>
                             <div className="flex items-center space-x-1.5">
-                              <span className="font-heading font-black text-xs text-orange-950">
+                              <span className={`font-heading font-black text-xs ${isDark ? 'text-orange-300' : 'text-orange-950'}`}>
                                 Table {call.tableNumber}
                               </span>
                               <span className="text-[10px] text-slate-400 font-mono">{call.time}</span>
                             </div>
-                            <p className="text-[11px] font-bold text-orange-800">{call.label}</p>
+                            <p className={`text-[11px] font-bold ${isDark ? 'text-orange-200' : 'text-orange-800'}`}>{call.label}</p>
                           </div>
 
                           <button
@@ -1047,7 +1109,9 @@ export default function App() {
               {/* Customer Menu Bypass Shortcut */}
               <button
                 onClick={() => setViewMode('customer')}
-                className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition"
+                className={`hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl border text-xs font-bold transition ${
+                  isDark ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+                }`}
                 title="Preview Guest Mobile QR Menu"
               >
                 <QrCode className="w-3.5 h-3.5" />
@@ -1057,7 +1121,9 @@ export default function App() {
               {/* Kitchen KDS Shortcut */}
               <button
                 onClick={() => setActiveTab('kitchen')}
-                className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition"
+                className={`hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-2xl border text-xs font-bold transition ${
+                  isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                }`}
                 title="Open Kitchen Display"
               >
                 <ChefHat className="w-3.5 h-3.5" />
@@ -1068,7 +1134,9 @@ export default function App() {
               <div className="relative">
                 <button
                   onClick={() => setNotificationOpen(!notificationOpen)}
-                  className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 relative"
+                  className={`p-2 rounded-2xl relative transition ${
+                    isDark ? 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
                 >
                   <Bell className="w-4 h-4" />
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow">
@@ -1077,22 +1145,24 @@ export default function App() {
                 </button>
 
                 {notificationOpen && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-3xl p-4 shadow-2xl border border-slate-200 space-y-2 z-50">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <span className="text-xs font-black text-slate-900 font-heading">Notifications</span>
-                      <span className="text-[10px] font-bold text-orange-600">3 Unread</span>
+                  <div className={`absolute right-0 mt-2 w-72 rounded-3xl p-4 shadow-2xl border space-y-2 z-50 ${
+                    isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+                  }`}>
+                    <div className="flex items-center justify-between border-b border-slate-800/40 pb-2">
+                      <span className="text-xs font-black font-heading">Notifications</span>
+                      <span className="text-[10px] font-bold text-orange-500">3 Unread</span>
                     </div>
                     <div className="space-y-2 text-xs">
-                      <div className="p-2 rounded-xl bg-orange-50 border border-orange-100">
-                        <p className="font-bold text-slate-800">New Order #ORD1048 received</p>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-orange-500/10 border-orange-500/20 text-slate-200' : 'bg-orange-50 border-orange-100 text-slate-800'}`}>
+                        <p className="font-bold">New Order #ORD1048 received</p>
                         <span className="text-[10px] text-slate-400">Table T04 • 2 mins ago</span>
                       </div>
-                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="font-bold text-slate-800">Payment received ₹260 (UPI)</p>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-800/70 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-800'}`}>
+                        <p className="font-bold">Payment received ₹260 (UPI)</p>
                         <span className="text-[10px] text-slate-400">Table T07 • 12 mins ago</span>
                       </div>
-                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="font-bold text-slate-800">Low Stock Alert: Basmati Rice</p>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-800/70 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-800'}`}>
+                        <p className="font-bold">Low Stock Alert: Basmati Rice</p>
                         <span className="text-[10px] text-slate-400">Kitchen Store • 1 hour ago</span>
                       </div>
                     </div>
@@ -1101,13 +1171,13 @@ export default function App() {
               </div>
 
               {/* User Avatar & Logout */}
-              <div className="flex items-center space-x-2 pl-1 border-l border-slate-200">
-                <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center font-heading">
+              <div className={`flex items-center space-x-2 pl-1 border-l ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <div className="w-8 h-8 rounded-full bg-orange-500 text-white font-black text-xs flex items-center justify-center font-heading shadow-md shadow-orange-500/30">
                   DR
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+                  className="p-1.5 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition"
                   title="Sign Out"
                 >
                   <LogOut className="w-4 h-4" />
@@ -1131,6 +1201,8 @@ export default function App() {
               activity={activity}
               categories={categories}
               currentLang={currentLang}
+              theme={theme}
+              onThemeChange={setTheme}
               onNavigate={(tab) => setActiveTab(tab)}
               onOpenAddOrder={() => setActiveTab('orders')}
               onOpenAddItem={() => setActiveTab('menu')}
