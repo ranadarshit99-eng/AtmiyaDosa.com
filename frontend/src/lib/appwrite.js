@@ -8,7 +8,16 @@ export { supabase, RESTAURANT_ID };
 export const getLocalStore = (key, fallback) => {
   try {
     const item = localStorage.getItem(`restaurant_${key}`);
-    return item ? JSON.parse(item) : fallback;
+    if (!item) return fallback;
+    const parsed = JSON.parse(item);
+    // Sanitize menu_items: remove any raw demo unsplash images as requested by user
+    if (key === 'menu_items' && Array.isArray(parsed)) {
+      return parsed.map(dish => ({
+        ...dish,
+        image_url: (dish.image_url && dish.image_url.includes('unsplash')) ? null : (dish.image_url || null)
+      }));
+    }
+    return parsed;
   } catch (e) {
     console.error('Storage Read Error:', e);
     return fallback;
@@ -136,351 +145,28 @@ export const INITIAL_TABLES = [
   { id: 'T16', number: 'T16', capacity: 4, zone: 'Main Hall', status: 'occupied', current_order_id: '#ORD1042', timing: '50m' }
 ];
 
-export const INITIAL_CATEGORIES = [
-  { id: 'cat_mysore', name: 'Mysore Dosa', percentage: 38, icon: 'Flame' },
-  { id: 'cat_fancy', name: 'Fancy Dosa', percentage: 28, icon: 'Sparkles' },
-  { id: 'cat_masala', name: 'Masala Dosa', percentage: 16, icon: 'Utensils' },
-  { id: 'cat_paper', name: 'Plain Paper Dosa', percentage: 10, icon: 'Leaf' },
-  { id: 'cat_pavbhaji', name: 'Pav Bhaji & Pulao', percentage: 5, icon: 'UtensilsCrossed' },
-  { id: 'cat_chinese', name: 'Chinese & Starters', percentage: 3, icon: 'ShoppingBag' }
-];
+import { AUTHENTIC_CATEGORIES, AUTHENTIC_MENU_CARD_ITEMS } from './authenticMenuData';
 
-// Menu items with authoritative originalPrice, finalPrice, and discount support (Section 4 of Admin.txt)
-export const INITIAL_MENU_ITEMS = [
-  // Mysore Dosa
-  {
-    id: 'm_mysore_masala',
-    name: 'Mysore Masala Dosa (માયસોર મસાલા)',
-    category: 'Mysore Dosa',
-    originalPrice: 130,
-    finalPrice: 130,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 130,
-    description: 'Crispy dosa coated with spicy Mysore chutney and loaded with seasoned potato masala.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 342,
-    prepTimeMins: 10,
-    rating: 4.9
-  },
-  {
-    id: 'm_paneer_mysore',
-    name: 'Paneer Mysore Dosa (પનીર માયસોર)',
-    category: 'Mysore Dosa',
-    originalPrice: 150,
-    finalPrice: 128,
-    hasDiscount: true,
-    discountPercent: 15,
-    price: 128,
-    description: 'Fresh malai paneer grated generously over hot spicy Mysore spread.',
-    image_url: 'https://images.unsplash.com/photo-1567184109411-b28f21ee097a?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 289,
-    prepTimeMins: 10,
-    rating: 4.8
-  },
-  {
-    id: 'm_cheese_mysore',
-    name: 'Cheese Mysore Dosa (ચીઝ માયસોર)',
-    category: 'Mysore Dosa',
-    originalPrice: 160,
-    finalPrice: 160,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 160,
-    description: 'Loaded with melted Amul cheese and signature Mysore red chutney.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: false,
-    is_available: true,
-    orders_count: 264,
-    prepTimeMins: 11,
-    rating: 4.8
-  },
-  {
-    id: 'm_sp_atmiya_mysore',
-    name: 'S.P. Atmiya Mysore (સ્પે. આત્મીય માયસોર)',
-    category: 'Mysore Dosa',
-    originalPrice: 210,
-    finalPrice: 210,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 210,
-    description: 'House specialty with dry fruits, paneer, double cheese, and royal Mysore gravy.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 230,
-    prepTimeMins: 13,
-    rating: 4.9
-  },
-  {
-    id: 'm_cheese_bhurji_mysore',
-    name: 'Cheese Bhurji Mysore (ચીઝ ભુરજી માયસોર)',
-    category: 'Mysore Dosa',
-    originalPrice: 230,
-    finalPrice: 230,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 230,
-    description: 'Tossed cheese bhurji stuffing with fresh capsicum and rich butter.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 198,
-    prepTimeMins: 12,
-    rating: 4.8
-  },
+export { AUTHENTIC_CATEGORIES, AUTHENTIC_MENU_CARD_ITEMS };
 
-  // Fancy Dosa
-  {
-    id: 'm_bahubali_dosa',
-    name: 'Bahubali Dosa (બાહુબલી ઢોસા)',
-    category: 'Fancy Dosa',
-    originalPrice: 350,
-    finalPrice: 298,
-    hasDiscount: true,
-    discountPercent: 15,
-    price: 298,
-    description: 'Colossal king-size dosa loaded with 4 varieties of gravies, paneer tikka, and triple cheese.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 175,
-    prepTimeMins: 16,
-    rating: 4.9
-  },
-  {
-    id: 'm_jini_roll',
-    name: 'Jini Roll Dosa (જીની રોલ)',
-    category: 'Fancy Dosa',
-    originalPrice: 200,
-    finalPrice: 200,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 200,
-    description: 'Street-style vegetable stuffing topped with molten cheese, rolled and cut into upright bite pieces.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 215,
-    prepTimeMins: 12,
-    rating: 4.8
-  },
-  {
-    id: 'm_chinese_dosa',
-    name: 'Chinese Dosa (ચાઈનીઝ ઢોંસા)',
-    category: 'Fancy Dosa',
-    originalPrice: 200,
-    finalPrice: 200,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 200,
-    description: 'Indo-Chinese fusion with crunchy cabbage, capsicum, noodles, and Schezwan sauce.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 160,
-    prepTimeMins: 11,
-    rating: 4.7
-  },
-  {
-    id: 'm_spring_roll_dosa',
-    name: 'Spring Roll Dosa (સ્પ્રિંગ રોલ)',
-    category: 'Fancy Dosa',
-    originalPrice: 250,
-    finalPrice: 250,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 250,
-    description: 'Crispy cylindrical rolls loaded with veggies, cheese, and spicy dip.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 140,
-    prepTimeMins: 13,
-    rating: 4.8
-  },
-  {
-    id: 'm_gotala_dosa',
-    name: 'Surti Gotala Dosa (ગોટાલા ઢોંસા)',
-    category: 'Fancy Dosa',
-    originalPrice: 220,
-    finalPrice: 220,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 220,
-    description: 'Surat famous thick tomato-onion spiced gravy topped with crushed crispy dosa and cheese.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 180,
-    prepTimeMins: 14,
-    rating: 4.9
-  },
-  {
-    id: 'm_mataka_dosa',
-    name: 'Mataka Dosa (મટકા ઢોસા)',
-    category: 'Fancy Dosa',
-    originalPrice: 300,
-    finalPrice: 300,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 300,
-    description: 'Slow-cooked bubbling cheese vegetable gravy served inside an authentic terracotta matka pot with dosa.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 120,
-    prepTimeMins: 15,
-    rating: 4.9
-  },
+export const INITIAL_CATEGORIES = AUTHENTIC_CATEGORIES;
+export const INITIAL_MENU_ITEMS = AUTHENTIC_MENU_CARD_ITEMS;
 
-  // Plain & Paper Dosa
-  {
-    id: 'm_plain_paper',
-    name: 'Plain Paper Dosa (પ્લેન પેપર)',
-    category: 'Plain Paper Dosa',
-    originalPrice: 60,
-    finalPrice: 60,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 60,
-    description: 'Super wafer-thin, large golden crispy crepe served with sambar and coconut dip.',
-    image_url: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: false,
-    is_available: true,
-    orders_count: 210,
-    prepTimeMins: 8,
-    rating: 4.7
-  },
-  {
-    id: 'm_cheese_paper',
-    name: 'Cheese Paper Dosa (ચીઝ પેપર)',
-    category: 'Plain Paper Dosa',
-    originalPrice: 90,
-    finalPrice: 90,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 90,
-    description: 'Thin crispy paper dosa brushed with butter and covered with melted Amul cheese.',
-    image_url: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: false,
-    is_available: true,
-    orders_count: 170,
-    prepTimeMins: 9,
-    rating: 4.8
-  },
+// 1-Click Load Authentic 7 Menu Cards or Clear Menu for Manual Creation
+export const loadAuthenticMenuCards = () => {
+  setLocalStore('menu_items', AUTHENTIC_MENU_CARD_ITEMS);
+  window.dispatchEvent(new Event('restaurant_data_updated'));
+  recordEmployeeActivity('DARSHIT RANA', 'Admin', 'MENU_SEEDED', 'Loaded all 177 authentic dishes from the 7 restaurant menu cards (pure-veg, zero stock photos)');
+  return AUTHENTIC_MENU_CARD_ITEMS;
+};
 
-  // Pav Bhaji & Pulao
-  {
-    id: 'm_butter_pav_bhaji',
-    name: 'Amul Butter Pav Bhaji (બટર પાંઉભાજી)',
-    category: 'Pav Bhaji & Pulao',
-    originalPrice: 80,
-    finalPrice: 80,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 80,
-    description: 'Thick mashed vegetable curry slow-simmered with aromatic spices, served with 2 buttery pav buns.',
-    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 195,
-    prepTimeMins: 8,
-    rating: 4.8
-  },
-  {
-    id: 'm_cheese_pav_bhaji',
-    name: 'Cheese Pav Bhaji (ચીઝ પાંઉભાજી)',
-    category: 'Pav Bhaji & Pulao',
-    originalPrice: 140,
-    finalPrice: 140,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 140,
-    description: 'Butter pav bhaji smothered with mountain of grated cheese.',
-    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 130,
-    prepTimeMins: 9,
-    rating: 4.8
-  },
-  {
-    id: 'm_sp_atmiya_pulao',
-    name: 'Sp. Atmiya Pulao (સ્પે. આત્મીય પુલાવ)',
-    category: 'Pav Bhaji & Pulao',
-    originalPrice: 150,
-    finalPrice: 150,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 150,
-    description: 'Basmati rice tossed with roasted cashews, paneer chunks, green peas, and rich desi ghee.',
-    image_url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: false,
-    is_available: true,
-    orders_count: 95,
-    prepTimeMins: 10,
-    rating: 4.7
-  },
+export const clearMenuItems = () => {
+  setLocalStore('menu_items', []);
+  window.dispatchEvent(new Event('restaurant_data_updated'));
+  recordEmployeeActivity('DARSHIT RANA', 'Admin', 'MENU_CLEARED', 'Cleared all menu items so user can create their custom menu from scratch');
+  return [];
+};
 
-  // Chinese Starters & Noodles
-  {
-    id: 'm_manchurian_dry',
-    name: 'Veg Manchurian Dry (મન્ચુરીયન ડ્રાય)',
-    category: 'Chinese & Starters',
-    originalPrice: 120,
-    finalPrice: 120,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 120,
-    description: 'Crisp vegetable dumplings tossed in garlic, ginger, soya, and spring onions.',
-    image_url: 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: true,
-    is_available: true,
-    orders_count: 110,
-    prepTimeMins: 11,
-    rating: 4.8
-  },
-  {
-    id: 'm_hakka_noodles',
-    name: 'Hakka Noodles (હક્કા નુડલ્સ)',
-    category: 'Chinese & Starters',
-    originalPrice: 120,
-    finalPrice: 120,
-    hasDiscount: false,
-    discountPercent: 0,
-    price: 120,
-    description: 'Wok-tossed noodles with julienne veggies, white pepper, and light soya sauce.',
-    image_url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80',
-    is_veg: true,
-    is_spicy: false,
-    is_available: true,
-    orders_count: 90,
-    prepTimeMins: 10,
-    rating: 4.7
-  }
-];
 
 // Real Orders with Payment Logic & Wait Time (Sections 2, 7 & 8 of Admin.txt)
 export const INITIAL_ORDERS = [

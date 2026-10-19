@@ -1505,9 +1505,21 @@ export default function ExecutiveDashboard({
                 <option value="all">All Categories</option>
                 <option value="mysore">Mysore Dosa</option>
                 <option value="fancy">Fancy Dosa</option>
-                <option value="pav bhaji">Pav Bhaji & Pulao</option>
-                <option value="plain paper">Plain Paper Dosa</option>
-                <option value="chinese">Chinese & Starters</option>
+                <option value="spacial">Spacial Item</option>
+                <option value="paper">Plain Paper Dosa</option>
+                <option value="masala">Masala Dosa</option>
+                <option value="pavu bhaji">Pavu Bhaji</option>
+                <option value="pulav">Pulav</option>
+                <option value="chinese rice">Chinese Rice</option>
+                <option value="stater">Stater</option>
+                <option value="noodles">Noodles</option>
+                <option value="maggi">Maggi</option>
+                <option value="soup">Soup</option>
+                <option value="uttapam">Uttapam</option>
+                <option value="idali">Idali</option>
+                <option value="vada">Vada & Dhokala</option>
+                <option value="papad">Papad & French Fries</option>
+                <option value="unlimited">Unlimited Meal Plans</option>
               </select>
 
               {/* Sort By Dropdown */}

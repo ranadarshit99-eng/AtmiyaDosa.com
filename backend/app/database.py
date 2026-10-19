@@ -303,9 +303,21 @@ CANONICAL_MENU: Dict[str, Dict[str, Any]] = {
 CANONICAL_CATEGORIES = [
     {"id": "cat_mysore", "name": "Mysore Dosa", "icon": "Flame"},
     {"id": "cat_fancy", "name": "Fancy Dosa", "icon": "Sparkles"},
+    {"id": "cat_special", "name": "Spacial Item", "icon": "Award"},
     {"id": "cat_paper", "name": "Plain Paper Dosa", "icon": "Layers"},
-    {"id": "cat_pavbhaji", "name": "Pav Bhaji & Pulao", "icon": "Soup"},
-    {"id": "cat_chinese", "name": "Chinese & Starters", "icon": "UtensilsCrossed"},
+    {"id": "cat_masala", "name": "Masala Dosa", "icon": "Utensils"},
+    {"id": "cat_pavbhaji", "name": "Pavu Bhaji", "icon": "UtensilsCrossed"},
+    {"id": "cat_pulav", "name": "Pulav", "icon": "Soup"},
+    {"id": "cat_chineserice", "name": "Chinese Rice", "icon": "ShoppingBag"},
+    {"id": "cat_stater", "name": "Stater", "icon": "Flame"},
+    {"id": "cat_noodles", "name": "Noodles", "icon": "Utensils"},
+    {"id": "cat_maggi", "name": "Maggi", "icon": "Flame"},
+    {"id": "cat_soup", "name": "Soup", "icon": "Coffee"},
+    {"id": "cat_uttapam", "name": "Uttapam", "icon": "Layers"},
+    {"id": "cat_idali", "name": "Idali", "icon": "Circle"},
+    {"id": "cat_vadadhokala", "name": "Vada & Dhokala", "icon": "Sun"},
+    {"id": "cat_papad", "name": "Papad & French Fries", "icon": "Sparkles"},
+    {"id": "cat_unlimited", "name": "Unlimited Meal Plans", "icon": "HeartHandshake"},
     {"id": "cat_beverages", "name": "Beverages", "icon": "Coffee"}
 ]
 

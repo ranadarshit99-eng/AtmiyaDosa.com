@@ -400,11 +400,12 @@ export default function CustomerMenu({
             </p>
           </div>
 
-          <img 
-            src="https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=260&q=80" 
-            alt="Dosa Plate" 
-            className="w-24 h-20 sm:w-32 sm:h-24 rounded-2xl object-cover shadow-lg shrink-0 hidden sm:block" 
-          />
+          <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex flex-col items-center justify-center p-2 shrink-0 hidden sm:flex">
+            <div className="w-7 h-7 border-2 border-white rounded-md flex items-center justify-center p-0.5">
+              <div className="w-3.5 h-3.5 rounded-full bg-white"></div>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-white mt-1">100% Veg</span>
+          </div>
         </div>
 
         {/* Search & Dietary Filters */}
@@ -420,13 +421,13 @@ export default function CustomerMenu({
             />
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-            {['All', 'Mysore Dosa', 'Fancy Dosa', 'Pav Bhaji & Pulao', 'Beverages', 'South Indian'].map(cat => (
+          {/* Dynamic Category Tabs From Live Menu */}
+          <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
+            {['All', ...Array.from(new Set(menuItems.map(m => m.category).filter(Boolean)))].map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                   selectedCategory === cat
                     ? 'bg-orange-500 text-white shadow-md'
                     : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
@@ -494,7 +495,7 @@ export default function CustomerMenu({
                 )}
 
                 <div 
-                  className="space-y-1.5 flex-1 pr-2 cursor-pointer"
+                  className="space-y-1 flex-1 pr-2 cursor-pointer"
                   onClick={() => handleOpenCustomizer(item)}
                 >
                   <div className="flex items-center space-x-1.5">
@@ -508,8 +509,13 @@ export default function CustomerMenu({
                   </div>
 
                   <h3 className="text-sm font-black text-slate-900 font-heading leading-tight hover:text-orange-600 transition">
-                    {item.name}
+                    {item.english_name || item.name}
                   </h3>
+                  {item.gujarati_name && (
+                    <p className="text-xs font-bold text-emerald-800 leading-snug">
+                      {item.gujarati_name}
+                    </p>
+                  )}
                   <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{item.description}</p>
                   
                   {/* Price Display with Strikethrough for Discount */}
@@ -537,12 +543,30 @@ export default function CustomerMenu({
                 </div>
 
                 <div className="flex flex-col items-center space-y-2 shrink-0">
-                  <img 
-                    src={item.image_url} 
-                    alt={item.name} 
-                    onClick={() => handleOpenCustomizer(item)}
-                    className="w-20 h-20 rounded-2xl object-cover shadow-sm cursor-pointer hover:opacity-95 transition" 
-                  />
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={item.name} 
+                      onClick={() => handleOpenCustomizer(item)}
+                      className="w-20 h-20 rounded-2xl object-cover shadow-sm cursor-pointer hover:opacity-95 transition" 
+                    />
+                  ) : (
+                    <div 
+                      onClick={() => handleOpenCustomizer(item)}
+                      className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-50 to-green-100/60 border border-emerald-200/80 flex flex-col items-center justify-center p-2 shadow-2xs cursor-pointer hover:border-emerald-400 hover:shadow-xs transition group"
+                      title="Click to customize dish"
+                    >
+                      <div className="w-5 h-5 border-2 border-emerald-600 rounded-sm flex items-center justify-center p-0.5 bg-white shadow-2xs group-hover:scale-110 transition">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-600"></div>
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 mt-1">
+                        Pure Veg
+                      </span>
+                      <span className="text-[8px] font-bold text-emerald-600 font-mono">
+                        {item.prepTimeMins ? `⚡ ${item.prepTimeMins}m` : 'Fresh'}
+                      </span>
+                    </div>
+                  )}
 
                   {qty === 0 ? (
                     <button
