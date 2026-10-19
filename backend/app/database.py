@@ -300,6 +300,30 @@ CANONICAL_MENU: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Auto-load all 177 authentic dishes from the 7 physical menu cards into server repository
+try:
+    import json, os
+    _auth_file = os.path.join(os.path.dirname(__file__), "authentic_menu_data.json")
+    if os.path.exists(_auth_file):
+        with open(_auth_file, "r", encoding="utf-8") as _f:
+            _data = json.load(_f)
+            for _item in _data.get("items", []):
+                _iid = _item.get("id")
+                CANONICAL_MENU[_iid] = {
+                    "id": _iid,
+                    "name": _item.get("english_name") or _item.get("name"),
+                    "gujarati_name": _item.get("gujarati_name"),
+                    "price": float(_item.get("finalPrice") or _item.get("price")),
+                    "category": _item.get("category"),
+                    "description": _item.get("description", ""),
+                    "is_available": _item.get("is_available", True),
+                    "is_jain_available": True,
+                    "prep_time_mins": _item.get("prepTimeMins", 10),
+                    "tags": ["Authentic", _item.get("category")]
+                }
+except Exception as _ex:
+    print(f"Warning: could not load authentic_menu_data.json: {_ex}")
+
 CANONICAL_CATEGORIES = [
     {"id": "cat_mysore", "name": "Mysore Dosa", "icon": "Flame"},
     {"id": "cat_fancy", "name": "Fancy Dosa", "icon": "Sparkles"},
