@@ -68,7 +68,8 @@ export default function OrdersView({
     // Search filter
     const matchesSearch = o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           o.table_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (o.customer_name && o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()));
+                          (o.customer_name && o.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          (o.customer_phone && o.customer_phone.includes(searchTerm));
     // Status filter
     const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -242,10 +243,19 @@ export default function OrdersView({
                         </span>
                       </td>
 
-                      {/* Customer Name */}
+                      {/* Customer Name & Mobile */}
                       <td className="p-4 whitespace-nowrap">
                         <div className="font-bold text-[#1F2937]">{order.customer_name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">Placed {order.time}</div>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                          {order.customer_phone ? (
+                            <span className="text-[10px] text-slate-600 font-mono font-bold bg-slate-100 px-1.5 py-0.2 rounded">
+                              📞 +91 {order.customer_phone}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-mono">Placed {order.time}</span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-mono">• {order.time}</span>
+                        </div>
                       </td>
 
                       {/* Wait Time (Section 7) */}

@@ -41,6 +41,9 @@ import {
   INITIAL_COUPONS,
   INITIAL_INVENTORY,
   INITIAL_SERVICE_CALLS,
+  INITIAL_CUSTOMERS,
+  saveCustomerProfile,
+  addCustomerLoyaltyPoints,
   recordEmployeeActivity
 } from './lib/appwrite';
 import { getTranslation } from './lib/translations';
@@ -59,6 +62,7 @@ import QRManagementView from './components/admin/QRManagementView';
 import SettingsView from './components/admin/SettingsView';
 import InventoryView from './components/admin/InventoryView';
 import QuickPosModal from './components/admin/QuickPosModal';
+import CustomerCRM from './components/admin/CustomerCRM';
 
 import CustomerMenu from './components/CustomerMenu';
 
@@ -95,6 +99,7 @@ export default function App() {
   const [coupons, setCoupons] = useState(() => getLocalStore('coupons', INITIAL_COUPONS));
   const [inventory, setInventory] = useState(() => getLocalStore('inventory', INITIAL_INVENTORY));
   const [serviceCalls, setServiceCalls] = useState(() => getLocalStore('service_calls', INITIAL_SERVICE_CALLS));
+  const [customers, setCustomers] = useState(() => getLocalStore('customers', INITIAL_CUSTOMERS));
 
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
@@ -115,6 +120,7 @@ export default function App() {
     setCoupons(getLocalStore('coupons', INITIAL_COUPONS));
     setInventory(getLocalStore('inventory', INITIAL_INVENTORY));
     setServiceCalls(getLocalStore('service_calls', INITIAL_SERVICE_CALLS));
+    setCustomers(getLocalStore('customers', INITIAL_CUSTOMERS));
     setAuthState(getLocalStore('auth_user', null));
   };
 
@@ -238,6 +244,37 @@ export default function App() {
     setOrders(updated);
     setLocalStore('orders', updated);
 
+    // Update corresponding dining table status to occupied with guest info
+    const updatedTables = tables.map(t => {
+      if (t.number === newOrder.table_number || t.number === `Table ${newOrder.table_number}` || t.id === newOrder.table_number) {
+        return {
+          ...t,
+          status: 'occupied',
+          current_order_id: newOrder.id,
+          current_customer_name: newOrder.customer_name,
+          current_customer_phone: newOrder.customer_phone,
+          timing: '1m'
+        };
+      }
+      return t;
+    });
+    setTables(updatedTables);
+    setLocalStore('tables', updatedTables);
+
+    // Permanently record customer profile in CRM
+    if (newOrder.customer_phone) {
+      saveCustomerProfile({
+        name: newOrder.customer_name,
+        phone: newOrder.customer_phone,
+        tableNumber: newOrder.table_number,
+        orderId: newOrder.id,
+        orderTotal: newOrder.total || newOrder.total_amount,
+        items: newOrder.items || [],
+        paymentMode: newOrder.payment_mode || 'UPI'
+      });
+      setCustomers(getLocalStore('customers', INITIAL_CUSTOMERS));
+    }
+
     recordEmployeeActivity({
       employeeName: newOrder.customer_name || 'Guest User',
       employeeRole: 'Guest / QR Self-Order',
@@ -245,11 +282,33 @@ export default function App() {
       actionType: 'ORDER_PLACED_QR',
       amount: newOrder.total,
       paymentMethod: newOrder.payment_mode || 'UPI',
-      details: `Order #${newOrder.id} placed via QR at Table ${newOrder.table_number} (₹${newOrder.total})`,
+      details: `Order #${newOrder.id} placed via QR at Table ${newOrder.table_number} by ${newOrder.customer_name || 'Guest'} (₹${newOrder.total})`,
       type: 'order',
       color: 'orange'
     });
     playSound('order');
+  };
+
+  const handleAddCustomerPoints = (customerId, points = 100) => {
+    const updated = addCustomerLoyaltyPoints(customerId, points);
+    setCustomers(updated);
+    const target = updated.find(c => c.id === customerId);
+    recordEmployeeActivity({
+      employeeName: authUser?.name || 'Admin',
+      employeeRole: 'Admin / Owner',
+      tableNumber: target?.last_table || 'CRM',
+      actionType: 'LOYALTY_POINTS_AWARDED',
+      details: `Awarded +${points} loyalty reward points to ${target?.name || 'Customer'}. New balance: ${target?.loyalty_points} Pts.`,
+      type: 'staff',
+      color: 'emerald'
+    });
+    playSound('success');
+  };
+
+  const handleSaveCustomerFromAdmin = (customerData) => {
+    const saved = saveCustomerProfile(customerData);
+    setCustomers(getLocalStore('customers', INITIAL_CUSTOMERS));
+    return saved;
   };
 
   const handleAddTable = (tableData) => {
@@ -827,6 +886,22 @@ export default function App() {
               <span>{t('employees')}</span>
             </button>
 
+            {/* VIP Guests & CRM */}
+            <button
+              onClick={() => { setActiveTab('crm'); setMobileSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-black transition ${
+                activeTab === 'crm' ? navActiveStyle : navInactiveStyle
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>Guest CRM & Loyalty</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-400">
+                {customers.length}
+              </span>
+            </button>
+
             {/* Reports & Analytics */}
             <button
               onClick={() => { setActiveTab('reports'); setMobileSidebarOpen(false); }}
@@ -1314,6 +1389,15 @@ export default function App() {
               tables={tables}
               restaurantSettings={settings}
               currentLang={currentLang}
+            />
+          )}
+
+          {activeTab === 'crm' && (
+            <CustomerCRM
+              customers={customers}
+              onAddPoints={handleAddCustomerPoints}
+              onSaveCustomer={handleSaveCustomerFromAdmin}
+              restaurantSettings={settings}
             />
           )}
 

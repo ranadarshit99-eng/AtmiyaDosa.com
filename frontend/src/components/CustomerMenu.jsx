@@ -23,10 +23,18 @@ import {
   Receipt,
   Heart,
   ChevronRight,
-  ChefHat
+  ChefHat,
+  User,
+  Phone,
+  ShieldCheck,
+  Star,
+  Award,
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 import { getTranslation } from '../lib/translations';
 import { playSound } from '../lib/sound';
+import { saveCustomerProfile, lookupCustomerByPhone } from '../lib/appwrite';
 
 export default function CustomerMenu({ 
   currentTable, 
@@ -63,10 +71,60 @@ export default function CustomerMenu({
   const [customNote, setCustomNote] = useState('');
 
   const [specialNote, setSpecialNote] = useState('');
-  const [paymentMode, setPaymentMode] = useState('UPI');
+  const [paymentMode, setPaymentMode] = useState('UPI'); // 'UPI' (Instant Online) or 'Cash' (COD / Pay at Counter)
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState('');
   const [serviceNotice, setServiceNotice] = useState('');
+
+  // Permanent Customer Identification & CRM Details
+  const [customerName, setCustomerName] = useState(() => {
+    try {
+      return localStorage.getItem('guest_customer_name') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    try {
+      return localStorage.getItem('guest_customer_phone') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [recognizedCustomer, setRecognizedCustomer] = useState(() => {
+    try {
+      const savedPhone = localStorage.getItem('guest_customer_phone');
+      if (savedPhone) {
+        return lookupCustomerByPhone(savedPhone);
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
+
+  const [validationError, setValidationError] = useState('');
+
+  const handlePhoneChange = (val) => {
+    const rawDigits = val.replace(/[^0-9]/g, '').slice(0, 10);
+    setCustomerPhone(rawDigits);
+    setValidationError('');
+    if (rawDigits.length === 10) {
+      const match = lookupCustomerByPhone(rawDigits);
+      if (match) {
+        setRecognizedCustomer(match);
+        if (!customerName || customerName.trim() === '') {
+          setCustomerName(match.name);
+        }
+      } else {
+        setRecognizedCustomer(null);
+      }
+    } else {
+      setRecognizedCustomer(null);
+    }
+  };
 
   const t = (key) => getTranslation(currentLang, key);
 
@@ -210,11 +268,38 @@ export default function CustomerMenu({
   const handleConfirmOrder = () => {
     if (cart.length === 0) return;
 
+    // Validate Customer Full Name
+    const trimmedName = (customerName || '').trim();
+    if (!trimmedName) {
+      setValidationError('Please enter your Name so the kitchen & waiter know who this order is for.');
+      return;
+    }
+
+    // Validate 10-digit Indian Mobile Phone Number
+    const cleanPhone = (customerPhone || '').replace(/[^0-9]/g, '').slice(-10);
+    if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setValidationError('Please enter a valid 10-digit Mobile Number (e.g. 98250 14820) for table order tracking & loyalty rewards.');
+      return;
+    }
+
+    setValidationError('');
+
+    // Persist locally for recurring orders during this visit
+    try {
+      localStorage.setItem('guest_customer_name', trimmedName);
+      localStorage.setItem('guest_customer_phone', cleanPhone);
+    } catch (e) {
+      console.error('Local customer storage error:', e);
+    }
+
     const newId = `#ORD${Math.floor(1000 + Math.random() * 9000)}`;
+    const isOnline = paymentMode === 'UPI';
+
     const newOrderObj = {
       id: newId,
       table_number: currentTable,
-      customer_name: `Table ${currentTable} Guest`,
+      customer_name: trimmedName,
+      customer_phone: cleanPhone,
       items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
       items_summary: cart.map(i => `${i.qty}x ${i.name}`).join(', '),
       subtotal: subtotal,
@@ -225,12 +310,27 @@ export default function CustomerMenu({
       status: 'Preparing',
       channel: 'Dine-In QR',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      payment_mode: paymentMode,
-      payment_status: paymentMode === 'UPI' ? 'Paid' : 'Pending Cash',
-      payment_verified_online: paymentMode === 'UPI',
-      paid_collected_by: paymentMode === 'UPI' ? 'UPI Gateway' : null,
+      payment_mode: isOnline ? 'UPI' : 'Cash',
+      payment_status: isOnline ? 'Paid' : 'Pending Cash',
+      payment_verified_online: isOnline,
+      paid_collected_by: isOnline ? 'UPI Gateway Direct' : null,
       special_note: specialNote
     };
+
+    // Permanently store & update Customer Relations / CRM profile
+    const savedCustomer = saveCustomerProfile({
+      name: trimmedName,
+      phone: cleanPhone,
+      tableNumber: currentTable,
+      orderId: newId,
+      orderTotal: totalAmount,
+      items: cart,
+      paymentMode: isOnline ? 'UPI' : 'Cash'
+    });
+
+    if (savedCustomer) {
+      setRecognizedCustomer(savedCustomer);
+    }
 
     onPlaceOrder(newOrderObj);
     playSound('order');
@@ -813,30 +913,181 @@ export default function CustomerMenu({
               )}
             </div>
 
-            {/* Payment Method Selector */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-600">{t('paymentMode')}</label>
-              <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('UPI')}
-                  className={`p-2.5 rounded-xl border transition ${
-                    paymentMode === 'UPI' ? 'bg-orange-500 text-white border-orange-600' : 'bg-slate-50 text-slate-700 border-slate-200'
-                  }`}
-                >
-                  {t('payUPI')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('Cash')}
-                  className={`p-2.5 rounded-xl border transition ${
-                    paymentMode === 'Cash' ? 'bg-orange-500 text-white border-orange-600' : 'bg-slate-50 text-slate-700 border-slate-200'
-                  }`}
-                >
-                  {t('payAtCounter')}
-                </button>
+            {/* Guest Details & Permanent CRM Association (Required for Table Dining) */}
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 font-heading flex items-center space-x-1.5">
+                    <User className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Guest Details (Table {currentTable})</span>
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Required for food serving & earning permanent loyalty rewards.
+                  </p>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-200">
+                  Required
+                </span>
+              </div>
+
+              {/* VIP Welcome Banner if Recognized Returning Diner */}
+              {recognizedCustomer && (
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-950 flex items-center justify-between shadow-xs animate-fadeIn">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                      <Star className="w-4 h-4 fill-white" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black">
+                        Welcome back, {recognizedCustomer.name}!
+                      </div>
+                      <p className="text-[10px] text-amber-800 font-medium">
+                        Visit #{recognizedCustomer.visits + 1} • <strong className="text-amber-900 font-bold">{recognizedCustomer.tier}</strong> • {recognizedCustomer.loyalty_points} Points
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-200 text-amber-900 shrink-0">
+                    VIP REGULAR
+                  </span>
+                </div>
+              )}
+
+              {/* Guest Full Name & 10-Digit Mobile Inputs */}
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Your Name <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Enter your full name (e.g. Rahul Sharma)"
+                      value={customerName}
+                      onChange={(e) => {
+                        setCustomerName(e.target.value);
+                        setValidationError('');
+                      }}
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    10-Digit Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-2.5 flex items-center space-x-1 text-slate-500 font-mono text-xs font-bold pointer-events-none">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                      <span>+91</span>
+                      <span className="text-slate-300">|</span>
+                    </div>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      placeholder="98250 14820"
+                      value={customerPhone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className="w-full pl-16 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 tracking-wider transition"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                    Saved permanently for Atmiya Dosa Hub VIP privileges & offers.
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Clear Payment Method Selection: Online UPI vs COD / Counter */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-900 font-heading">
+                  Choose Payment Option
+                </label>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  Select payment mode
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* 1. Online Payment Option (Instant UPI) */}
+                <div
+                  onClick={() => setPaymentMode('UPI')}
+                  className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between space-y-1.5 ${
+                    paymentMode === 'UPI'
+                      ? 'bg-emerald-50/60 border-emerald-500 ring-2 ring-emerald-400/20 shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs ${
+                        paymentMode === 'UPI' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        ⚡
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-heading">
+                        Pay Online (UPI)
+                      </span>
+                    </div>
+                    {paymentMode === 'UPI' && (
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Instant UPI QR (GPay, PhonePe, Paytm). Bill marked Paid immediately.
+                  </p>
+                  <span className="inline-block self-start px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-emerald-100 text-emerald-800">
+                    ✅ Instant Kitchen Fire
+                  </span>
+                </div>
+
+                {/* 2. Cash on Delivery / Pay at Counter Option */}
+                <div
+                  onClick={() => setPaymentMode('Cash')}
+                  className={`p-3 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between space-y-1.5 ${
+                    paymentMode === 'Cash'
+                      ? 'bg-amber-50/60 border-amber-500 ring-2 ring-amber-400/20 shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs ${
+                        paymentMode === 'Cash' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        💵
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-heading">
+                        Cash on Delivery
+                      </span>
+                    </div>
+                    {paymentMode === 'Cash' && (
+                      <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Eat first, pay cash or card at the cashier desk before leaving.
+                  </p>
+                  <span className="inline-block self-start px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-amber-100 text-amber-900">
+                    ⚠️ Pay at Counter After Dining
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Validation Error Banner */}
+            {validationError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold flex items-center space-x-2 animate-shake">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{validationError}</span>
+              </div>
+            )}
 
             {/* Price Calculations */}
             <div className="border-t border-dashed border-slate-200 pt-3 space-y-1 text-xs">
@@ -845,7 +1096,7 @@ export default function CustomerMenu({
                 <span>₹{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-slate-600">
-                <span>{t('tax')}:</span>
+                <span>{t('tax')} (5% GST):</span>
                 <span>₹{tax.toFixed(2)}</span>
               </div>
               {discount > 0 && (
@@ -855,16 +1106,16 @@ export default function CustomerMenu({
                 </div>
               )}
               <div className="flex justify-between text-base font-black text-slate-950 pt-2 border-t border-slate-200 font-heading">
-                <span>{t('total')}:</span>
-                <span className="text-orange-600 font-mono">₹{totalAmount.toFixed(2)}</span>
+                <span>Total to Pay:</span>
+                <span className="text-orange-600 font-mono text-lg">₹{totalAmount.toFixed(2)}</span>
               </div>
             </div>
 
             <button
               onClick={handleConfirmOrder}
-              className="w-full py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-sm shadow-xl transition flex items-center justify-center space-x-2"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-xl shadow-orange-500/25 transition flex items-center justify-center space-x-2"
             >
-              <span>{t('placeOrder')}</span>
+              <span>Confirm Table {currentTable} Order (₹{totalAmount.toFixed(2)})</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -942,25 +1193,62 @@ export default function CustomerMenu({
 
       {/* 8. ORDER PLACED SUCCESS MODAL */}
       {orderSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl border border-slate-200">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full text-center space-y-4 shadow-2xl border border-slate-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-xl font-black text-slate-900 font-heading">Order Placed!</h3>
-              <p className="text-xs font-bold text-orange-600 font-mono">{placedOrderId}</p>
-              <p className="text-xs font-medium text-slate-500 pt-1">
-                {t('orderPlacedSuccess')} Your chef has started preparing your fresh food.
+              <h3 className="text-xl font-black text-slate-900 font-heading">Order Received!</h3>
+              <p className="text-sm font-black text-orange-600 font-mono tracking-wider">{placedOrderId}</p>
+              <p className="text-xs font-semibold text-slate-500">
+                Piping hot pure-veg dishes are now being prepared in the kitchen.
               </p>
             </div>
 
+            {/* Order Confirmation Details Box */}
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-bold">Assigned Table:</span>
+                <span className="font-mono font-black text-slate-900 text-sm bg-orange-100 text-orange-900 px-2 py-0.5 rounded-lg">
+                  Table {currentTable}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-bold">Guest:</span>
+                <span className="font-black text-slate-900">{customerName}</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-bold">Mobile:</span>
+                <span className="font-mono font-bold text-slate-700">+91 {customerPhone}</span>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                <span className="text-slate-500 font-bold">Payment Method:</span>
+                {paymentMode === 'UPI' ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    ✅ Paid Online (UPI)
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                    ⚠️ Cash on Delivery (At Counter)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-400 font-medium">
+              Permanent customer record saved with loyalty reward points.
+            </p>
+
             <button
               onClick={() => setOrderSuccess(false)}
-              className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-900 text-white font-black text-xs shadow-md transition"
+              className="w-full py-3.5 rounded-2xl bg-slate-950 hover:bg-slate-900 text-white font-black text-xs shadow-md transition"
             >
-              Continue Dining
+              Continue to Table Menu
             </button>
           </div>
         </div>

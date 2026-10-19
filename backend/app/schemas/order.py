@@ -10,6 +10,7 @@ class GuestOrderItem(BaseModel):
 class GuestOrderCreate(BaseModel):
     table_number: str = Field(..., min_length=1, max_length=20, description="Dining table number (e.g. T04, VIP-1)")
     customer_name: Optional[str] = Field(default="Walk-in Guest", max_length=100)
+    customer_phone: Optional[str] = Field(default=None, max_length=20, description="Customer 10-digit mobile number")
     items: List[GuestOrderItem] = Field(..., min_length=1, description="List of items ordered")
     coupon_code: Optional[str] = Field(default=None, max_length=30)
     payment_mode: Optional[str] = Field(default="Cash", description="Cash | UPI | Card")
@@ -35,6 +36,7 @@ class OrderResponse(BaseModel):
     id: str
     table_number: str
     customer_name: str
+    customer_phone: Optional[str] = None
     items: List[OrderItemDetail]
     items_summary: str
     subtotal: float

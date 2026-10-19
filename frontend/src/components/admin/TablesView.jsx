@@ -393,12 +393,16 @@ export default function TablesView({
 
                   {isOccupied ? (
                     (() => {
-                      const isOrderPaid = activeOrder && (
-                        activeOrder.payment_status === 'Paid' || 
-                        activeOrder.payment_status === 'PAID' || 
-                        activeOrder.payment_mode === 'Razorpay' || 
-                        activeOrder.payment_mode === 'Online' || 
-                        activeOrder.payment_mode === 'ONLINE_RAZORPAY'
+                      const isOrderPaid = Boolean(
+                        activeOrder && (
+                          activeOrder.payment_status === 'Paid' || 
+                          activeOrder.payment_status === 'PAID' || 
+                          activeOrder.payment_mode === 'Razorpay' || 
+                          activeOrder.payment_mode === 'Online' || 
+                          activeOrder.payment_mode === 'ONLINE_RAZORPAY' ||
+                          activeOrder.payment_mode === 'UPI' ||
+                          activeOrder.payment_verified_online === true
+                        )
                       );
                       return (
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
@@ -433,14 +437,26 @@ export default function TablesView({
                   </div>
 
                   {isOccupied && (
-                    <div className="flex items-center justify-between text-orange-600 font-bold font-mono pt-1 border-t border-orange-100">
-                      <span className="flex items-center space-x-1 text-[11px]">
-                        <Clock className="w-3 h-3" />
-                        <span>{table.timing || '18m'}</span>
-                      </span>
-                      {orderTotal !== null && (
-                        <span className="text-xs font-black text-slate-900">₹{orderTotal}</span>
-                      )}
+                    <div className="pt-1.5 border-t border-orange-200/60 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-black text-slate-900 truncate max-w-[120px]">
+                          👤 {activeOrder?.customer_name || table.current_customer_name || 'Guest'}
+                        </span>
+                        {(activeOrder?.customer_phone || table.current_customer_phone) && (
+                          <span className="font-mono text-[10px] text-slate-500 font-bold">
+                            📞 {(activeOrder?.customer_phone || table.current_customer_phone).slice(-4)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-orange-600 font-bold font-mono">
+                        <span className="flex items-center space-x-1 text-[11px]">
+                          <Clock className="w-3 h-3" />
+                          <span>{table.timing || '18m'}</span>
+                        </span>
+                        {orderTotal !== null && (
+                          <span className="text-xs font-black text-slate-900">₹{orderTotal}</span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -650,6 +666,11 @@ export default function TablesView({
                       </div>
                       <div className="text-[11px] text-orange-700 font-medium mt-0.5">
                         Guest: <span className="font-bold text-orange-900">{activeOrder.customer_name || 'Guest'}</span>
+                        {(activeOrder.customer_phone || selectedTable.current_customer_phone) && (
+                          <span className="ml-2 font-mono text-[10px] bg-orange-200/80 px-2 py-0.5 rounded-full text-orange-950 font-bold">
+                            📞 +91 {activeOrder.customer_phone || selectedTable.current_customer_phone}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">

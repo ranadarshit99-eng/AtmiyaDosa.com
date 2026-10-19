@@ -10,12 +10,20 @@ export const getLocalStore = (key, fallback) => {
     const item = localStorage.getItem(`restaurant_${key}`);
     if (!item) return fallback;
     const parsed = JSON.parse(item);
-    // Sanitize menu_items: remove any raw demo unsplash images as requested by user
+    // Ensure authentic menu items (ATM0001 - ATM0177) with strictly NO images as requested
     if (key === 'menu_items' && Array.isArray(parsed)) {
+      if (parsed.length === 0 || !parsed.some(d => d.id && d.id.startsWith('ATM'))) {
+        return fallback;
+      }
       return parsed.map(dish => ({
         ...dish,
-        image_url: (dish.image_url && dish.image_url.includes('unsplash')) ? null : (dish.image_url || null)
+        image_url: null
       }));
+    }
+    if (key === 'categories' && Array.isArray(parsed)) {
+      if (parsed.length === 0 || !parsed.some(c => c.name === 'Plain Paper Dosa')) {
+        return fallback;
+      }
     }
     return parsed;
   } catch (e) {
@@ -154,9 +162,10 @@ export const INITIAL_MENU_ITEMS = AUTHENTIC_MENU_CARD_ITEMS;
 
 // 1-Click Load Authentic 7 Menu Cards or Clear Menu for Manual Creation
 export const loadAuthenticMenuCards = () => {
+  setLocalStore('categories', AUTHENTIC_CATEGORIES);
   setLocalStore('menu_items', AUTHENTIC_MENU_CARD_ITEMS);
   window.dispatchEvent(new Event('restaurant_data_updated'));
-  recordEmployeeActivity('DARSHIT RANA', 'Admin', 'MENU_SEEDED', 'Loaded all 177 authentic dishes from the 7 restaurant menu cards (pure-veg, zero stock photos)');
+  recordEmployeeActivity('DARSHIT RANA', 'Admin', 'MENU_SEEDED', 'Loaded all 177 authentic dishes from the 7 restaurant menu cards (ATM0001 - ATM0177, pure-veg, zero stock photos)');
   return AUTHENTIC_MENU_CARD_ITEMS;
 };
 
@@ -174,6 +183,7 @@ export const INITIAL_ORDERS = [
     id: '#ORD1048',
     table_number: 'T04',
     customer_name: 'Rahul Sharma',
+    customer_phone: '9825014820',
     order_source: 'Dine-In',
     items: [
       { id: 'm_mysore_masala', name: 'Mysore Masala Dosa', price: 130, qty: 2 },
@@ -198,6 +208,7 @@ export const INITIAL_ORDERS = [
     id: '#ORD1047',
     table_number: 'T07',
     customer_name: 'Anjali Patel',
+    customer_phone: '9898023456',
     order_source: 'Dine-In',
     items: [
       { id: 'm_cheese_mysore', name: 'Cheese Mysore Dosa', price: 160, qty: 1 },
@@ -222,6 +233,7 @@ export const INITIAL_ORDERS = [
     id: '#ORD1046',
     table_number: 'T11',
     customer_name: 'Suresh Mehta',
+    customer_phone: '9924577889',
     order_source: 'Dine-In',
     items: [
       { id: 'm_gotala_dosa', name: 'Surti Gotala Dosa', price: 220, qty: 1 }
@@ -292,6 +304,7 @@ export const INITIAL_ORDERS = [
     id: '#ORD1045',
     table_number: 'T02',
     customer_name: 'Vikram Joshi',
+    customer_phone: '9712344556',
     order_source: 'Dine-In',
     items: [
       { id: 'm_mysore_masala', name: 'Mysore Masala Dosa', price: 130, qty: 2 },
@@ -316,6 +329,7 @@ export const INITIAL_ORDERS = [
     id: '#ORD1043',
     table_number: 'T06',
     customer_name: 'Kiran Shah',
+    customer_phone: '9822099881',
     order_source: 'Dine-In',
     items: [
       { id: 'm_cheese_bhurji_mysore', name: 'Cheese Bhurji Mysore', price: 230, qty: 2 }
@@ -450,6 +464,202 @@ export const INITIAL_SERVICE_CALLS = [
   { id: 'srv_1', tableNumber: 'T02', type: 'WATER', label: 'Extra Water Jar', time: '11:43 AM', status: 'pending' },
   { id: 'srv_2', tableNumber: 'T07', type: 'BILL', label: 'Bill / Payment Settle', time: '11:45 AM', status: 'pending' }
 ];
+
+// Permanent Customer Relationship Management (CRM) Database
+export const INITIAL_CUSTOMERS = [
+  {
+    id: 'cust_01',
+    name: 'Rahul Sharma',
+    phone: '9825014820',
+    tier: 'VIP Gold',
+    visits: 4,
+    total_spent: 1260,
+    loyalty_points: 126,
+    last_table: 'T04',
+    last_visit: 'Today, 11:32 AM',
+    favorite_dish: 'Mysore Masala Dosa',
+    notes: 'Regular guest, prefers extra crisp dosa'
+  },
+  {
+    id: 'cust_02',
+    name: 'Anjali Patel',
+    phone: '9898023456',
+    tier: 'VIP Platinum',
+    visits: 7,
+    total_spent: 2450,
+    loyalty_points: 245,
+    last_table: 'T07',
+    last_visit: 'Today, 11:18 AM',
+    favorite_dish: 'Cheese Mysore Dosa',
+    notes: 'Loyal family diner, likes mild sambhar'
+  },
+  {
+    id: 'cust_03',
+    name: 'Suresh Mehta',
+    phone: '9924577889',
+    tier: 'Silver Member',
+    visits: 3,
+    total_spent: 780,
+    loyalty_points: 78,
+    last_table: 'T11',
+    last_visit: 'Today, 10:56 AM',
+    favorite_dish: 'Surti Gotala Dosa',
+    notes: 'Prefers Jain food options'
+  },
+  {
+    id: 'cust_04',
+    name: 'Vikram Joshi',
+    phone: '9712344556',
+    tier: 'VIP Gold',
+    visits: 5,
+    total_spent: 1850,
+    loyalty_points: 185,
+    last_table: 'T02',
+    last_visit: 'Today, 10:42 AM',
+    favorite_dish: 'Amul Butter Pav Bhaji',
+    notes: 'Daily luncheon diner'
+  },
+  {
+    id: 'cust_05',
+    name: 'Kiran Shah',
+    phone: '9822099881',
+    tier: 'Silver Member',
+    visits: 2,
+    total_spent: 920,
+    loyalty_points: 92,
+    last_table: 'T06',
+    last_visit: 'Today, 09:55 AM',
+    favorite_dish: 'Cheese Bhurji Mysore',
+    notes: 'Enjoys cheese items'
+  }
+];
+
+// Permanent Customer Persistence & Relations Engine
+export const saveCustomerProfile = ({ name, phone, tableNumber, orderId, orderTotal = 0, items = [], paymentMode = 'UPI' }) => {
+  if (!phone) return null;
+  const cleanPhone = String(phone).replace(/[^0-9]/g, '').slice(-10);
+  if (cleanPhone.length < 10) return null;
+
+  const cleanName = (name && name.trim()) ? name.trim() : `Guest ${cleanPhone.slice(-4)}`;
+  const currentCustomers = getLocalStore('customers', INITIAL_CUSTOMERS);
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString([], { day: '2-digit', month: 'short' });
+  const visitTimestamp = `${dateStr}, ${timeStr}`;
+
+  const existingIdx = currentCustomers.findIndex(c => String(c.phone).replace(/[^0-9]/g, '').slice(-10) === cleanPhone);
+
+  const pointsEarned = Math.round(Number(orderTotal) * 0.1); // 10% loyalty reward points
+  const firstItemName = (items && items.length > 0 && items[0]) ? (items[0].name || items[0].title || 'Mysore Masala Dosa') : 'Special Dosa';
+
+  let updatedCustomers = [];
+  let savedProfile = null;
+
+  if (existingIdx > -1) {
+    const existing = currentCustomers[existingIdx];
+    const newVisits = (Number(existing.visits) || 0) + 1;
+    const newTotalSpent = (Number(existing.total_spent) || 0) + Number(orderTotal);
+    const newPoints = (Number(existing.loyalty_points) || 0) + pointsEarned;
+    
+    // Tier threshold calculation
+    let newTier = 'Silver Member';
+    if (newTotalSpent >= 2000 || newVisits >= 6) {
+      newTier = 'VIP Platinum';
+    } else if (newTotalSpent >= 1000 || newVisits >= 3) {
+      newTier = 'VIP Gold';
+    }
+
+    savedProfile = {
+      ...existing,
+      name: cleanName || existing.name,
+      phone: cleanPhone,
+      visits: newVisits,
+      total_spent: newTotalSpent,
+      loyalty_points: newPoints,
+      tier: newTier,
+      last_table: tableNumber || existing.last_table,
+      last_visit: visitTimestamp,
+      last_order_id: orderId || existing.last_order_id,
+      favorite_dish: existing.favorite_dish || firstItemName,
+      history: [
+        {
+          order_id: orderId,
+          table: tableNumber,
+          amount: Number(orderTotal),
+          payment_mode: paymentMode,
+          date: visitTimestamp,
+          items_summary: items.map(i => `${i.qty || 1}x ${i.name}`).join(', ')
+        },
+        ...(existing.history || []).slice(0, 19)
+      ]
+    };
+
+    updatedCustomers = [...currentCustomers];
+    updatedCustomers[existingIdx] = savedProfile;
+  } else {
+    // New Customer
+    let newTier = 'Silver Member';
+    if (Number(orderTotal) >= 2000) newTier = 'VIP Platinum';
+    else if (Number(orderTotal) >= 1000) newTier = 'VIP Gold';
+
+    savedProfile = {
+      id: `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: cleanName,
+      phone: cleanPhone,
+      tier: newTier,
+      visits: 1,
+      total_spent: Number(orderTotal),
+      loyalty_points: pointsEarned,
+      last_table: tableNumber || 'T01',
+      last_visit: visitTimestamp,
+      first_visit: visitTimestamp,
+      last_order_id: orderId,
+      favorite_dish: firstItemName,
+      history: [
+        {
+          order_id: orderId,
+          table: tableNumber,
+          amount: Number(orderTotal),
+          payment_mode: paymentMode,
+          date: visitTimestamp,
+          items_summary: items.map(i => `${i.qty || 1}x ${i.name}`).join(', ')
+        }
+      ]
+    };
+
+    updatedCustomers = [savedProfile, ...currentCustomers];
+  }
+
+  setLocalStore('customers', updatedCustomers);
+  window.dispatchEvent(new Event('restaurant_data_updated'));
+  return savedProfile;
+};
+
+export const lookupCustomerByPhone = (phone) => {
+  if (!phone) return null;
+  const clean = String(phone).replace(/[^0-9]/g, '').slice(-10);
+  if (clean.length < 10) return null;
+  const currentCustomers = getLocalStore('customers', INITIAL_CUSTOMERS);
+  return currentCustomers.find(c => String(c.phone).replace(/[^0-9]/g, '').slice(-10) === clean) || null;
+};
+
+export const addCustomerLoyaltyPoints = (customerId, points) => {
+  const currentCustomers = getLocalStore('customers', INITIAL_CUSTOMERS);
+  const updated = currentCustomers.map(c => {
+    if (c.id === customerId) {
+      const newPoints = (Number(c.loyalty_points) || 0) + points;
+      let newTier = c.tier;
+      if (newPoints >= 250 || c.total_spent >= 2000) newTier = 'VIP Platinum';
+      else if (newPoints >= 100 || c.total_spent >= 1000) newTier = 'VIP Gold';
+      return { ...c, loyalty_points: newPoints, tier: newTier };
+    }
+    return c;
+  });
+  setLocalStore('customers', updated);
+  window.dispatchEvent(new Event('restaurant_data_updated'));
+  return updated;
+};
+
 
 
 

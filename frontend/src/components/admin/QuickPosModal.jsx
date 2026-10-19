@@ -20,6 +20,7 @@ import {
   Divide
 } from 'lucide-react';
 import { playSound } from '../../lib/sound';
+import { lookupCustomerByPhone, saveCustomerProfile } from '../../lib/appwrite';
 
 export default function QuickPosModal({ 
   tables = [], 
@@ -34,6 +35,7 @@ export default function QuickPosModal({
   const [selectedTable, setSelectedTable] = useState('T01');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [recognizedCustomer, setRecognizedCustomer] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -129,12 +131,15 @@ export default function QuickPosModal({
     }
 
     const orderId = `#ORD${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalCustomerName = (customerName || '').trim() || (selectedChannel === 'Dine-In' ? `Table ${selectedTable} Guest` : 'Walk-in Customer');
+    const cleanPhone = (customerPhone || '').replace(/[^0-9]/g, '').slice(-10);
+
     const newOrderObj = {
       id: orderId,
       table_number: selectedChannel === 'Dine-In' ? selectedTable : selectedChannel,
       channel: selectedChannel,
-      customer_name: customerName || (selectedChannel === 'Dine-In' ? `Table ${selectedTable} Guest` : 'Walk-in Customer'),
-      customer_phone: customerPhone,
+      customer_name: finalCustomerName,
+      customer_phone: cleanPhone,
       items: cart.map(i => {
         const modTags = [];
         if (i.modifiers.extraButter) modTags.push('+Extra Butter');
@@ -158,9 +163,22 @@ export default function QuickPosModal({
       payment_mode: paymentMode,
       payment_status: paymentMode === 'Cash' ? 'Pending Cash' : 'Paid',
       payment_verified_online: paymentMode !== 'Cash',
-      paid_collected_by: paymentMode === 'Cash' ? null : 'Online / Card Direct',
+      paid_collected_by: paymentMode === 'Cash' ? null : `${paymentMode} Direct`,
       punch_by: currentStaff.name
     };
+
+    // Permanently persist in CRM if phone provided
+    if (cleanPhone && cleanPhone.length === 10) {
+      saveCustomerProfile({
+        name: finalCustomerName,
+        phone: cleanPhone,
+        tableNumber: selectedChannel === 'Dine-In' ? selectedTable : selectedChannel,
+        orderId,
+        orderTotal: grandTotal,
+        items: cart,
+        paymentMode
+      });
+    }
 
     onPlaceOrder(newOrderObj);
     playSound('cash');
@@ -247,29 +265,62 @@ export default function QuickPosModal({
               )}
             </div>
 
-            {/* Customer VIP Info */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Customer Name (Optional)"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:border-orange-500 shadow-sm"
-                />
+            {/* Customer VIP Info & Permanent CRM */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Customer Name (e.g. Rahul Sharma)"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500 shadow-sm"
+                  />
+                </div>
+
+                <div className="relative">
+                  <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="Mobile No. (e.g. 98250 14820)"
+                    value={customerPhone}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                      setCustomerPhone(digits);
+                      if (digits.length === 10) {
+                        const match = lookupCustomerByPhone(digits);
+                        if (match) {
+                          setRecognizedCustomer(match);
+                          if (!customerName || customerName.trim() === '') {
+                            setCustomerName(match.name);
+                          }
+                        } else {
+                          setRecognizedCustomer(null);
+                        }
+                      } else {
+                        setRecognizedCustomer(null);
+                      }
+                    }}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold font-mono text-slate-800 focus:outline-none focus:border-orange-500 shadow-sm tracking-wider"
+                  />
+                </div>
               </div>
 
-              <div className="relative">
-                <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Mobile No. (e.g. 98250 12345)"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:border-orange-500 shadow-sm"
-                />
-              </div>
+              {/* VIP Recognized Regular Guest Pill */}
+              {recognizedCustomer && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-between text-xs font-bold">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Recognized VIP: <strong>{recognizedCustomer.name}</strong></span>
+                    <span className="text-[10px] text-amber-800 font-semibold">({recognizedCustomer.tier} • {recognizedCustomer.visits} Visits • {recognizedCustomer.loyalty_points} Pts)</span>
+                  </div>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md uppercase font-black">
+                    Loyalty Member
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Category Filter & Search Bar */}

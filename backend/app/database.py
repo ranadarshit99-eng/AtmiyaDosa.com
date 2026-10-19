@@ -321,6 +321,8 @@ try:
                     "prep_time_mins": _item.get("prepTimeMins", 10),
                     "tags": ["Authentic", _item.get("category")]
                 }
+            if _data.get("categories"):
+                CANONICAL_CATEGORIES = _data.get("categories")
 except Exception as _ex:
     print(f"Warning: could not load authentic_menu_data.json: {_ex}")
 
