@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { QrCode, Printer, Download, ExternalLink, Sparkles, Check, Copy } from 'lucide-react';
+import { QrCode, Printer, Download, ExternalLink, Sparkles, Check, Copy, Wifi, Smartphone, Globe } from 'lucide-react';
 import { getTranslation } from '../../lib/translations';
 
 export default function QRManagementView({ tables, restaurantSettings, currentLang }) {
@@ -9,8 +9,29 @@ export default function QRManagementView({ tables, restaurantSettings, currentLa
 
   const t = (key) => getTranslation(currentLang, key);
 
+  // Network IP detection: default to local Wi-Fi IP so phone camera scans actually connect!
+  const detectedWifiUrl = 'http://10.82.223.138:5173';
+  const defaultHost = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? detectedWifiUrl
+    : (typeof window !== 'undefined' ? window.location.origin : detectedWifiUrl);
+
+  const [baseUrl, setBaseUrl] = useState(() => {
+    try {
+      return localStorage.getItem('qr_base_url') || defaultHost;
+    } catch {
+      return defaultHost;
+    }
+  });
+
+  const handleSetBaseUrl = (newUrl) => {
+    setBaseUrl(newUrl);
+    try {
+      localStorage.setItem('qr_base_url', newUrl);
+    } catch {}
+  };
+
   // Real URL that bypasses the login wall for the guest
-  const tableUrl = `${window.location.origin}/?table=${activeTable.number}`;
+  const tableUrl = `${baseUrl.replace(/\/+$/, '')}/?table=${activeTable.number}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(tableUrl);
@@ -82,6 +103,43 @@ export default function QRManagementView({ tables, restaurantSettings, currentLa
         {/* Real QR Preview & Standee Designer (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
           
+          {/* Host Mode Selector for Localhost vs Wi-Fi Network */}
+          <div className="bg-orange-50/80 border border-orange-200/80 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-2">
+              <Wifi className="w-4 h-4 text-orange-600 shrink-0" />
+              <span className="font-bold text-slate-800">QR Scan Target:</span>
+              <span className="text-[11px] text-slate-600">
+                For phones scanning from same Wi-Fi, use Wi-Fi IP (<code className="bg-white px-1.5 py-0.5 rounded border border-orange-200 font-bold text-orange-700">10.82.223.138:5173</code>)
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => handleSetBaseUrl('http://10.82.223.138:5173')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition flex items-center space-x-1 ${
+                  baseUrl.includes('10.82.223.138')
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>Wi-Fi Mobile</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetBaseUrl(typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition flex items-center space-x-1 ${
+                  !baseUrl.includes('10.82.223.138')
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Globe className="w-3 h-3" />
+                <span>Current Host</span>
+              </button>
+            </div>
+          </div>
+
           {/* URL & Quick Actions Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center space-x-2 truncate w-full sm:w-auto">
